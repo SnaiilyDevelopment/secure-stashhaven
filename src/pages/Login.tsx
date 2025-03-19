@@ -18,7 +18,8 @@ const Login = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (await isAuthenticated()) {
+      const authenticated = await isAuthenticated();
+      if (authenticated) {
         navigate('/dashboard');
       }
     };
@@ -32,6 +33,7 @@ const Login = () => {
     try {
       const success = await loginUser(email, password);
       if (success) {
+        // Explicitly navigate to dashboard on successful login
         navigate('/dashboard');
       }
     } finally {

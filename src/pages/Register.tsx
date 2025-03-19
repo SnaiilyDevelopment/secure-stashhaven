@@ -21,7 +21,8 @@ const Register = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (await isAuthenticated()) {
+      const authenticated = await isAuthenticated();
+      if (authenticated) {
         navigate('/dashboard');
       }
     };
@@ -60,6 +61,7 @@ const Register = () => {
     try {
       const success = await registerUser(email, password);
       if (success) {
+        // Explicitly navigate to dashboard on successful registration
         navigate('/dashboard');
       }
     } finally {

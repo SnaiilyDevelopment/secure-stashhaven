@@ -24,14 +24,22 @@ const App = () => {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session ? "User logged in" : "No session");
       const authenticated = await isAuthenticated();
+      console.log("isAuthenticated returned:", authenticated);
       setIsLoggedIn(authenticated);
       setIsReady(true);
+      
+      // Force navigation to dashboard on login events
+      if (authenticated && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+        window.location.href = '/dashboard';
+      }
     });
     
     // Check initial auth state
     const checkAuth = async () => {
       const authenticated = await isAuthenticated();
+      console.log("Initial auth check:", authenticated);
       setIsLoggedIn(authenticated);
       setIsReady(true);
     };

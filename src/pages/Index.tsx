@@ -8,11 +8,15 @@ const Index = () => {
   
   useEffect(() => {
     // Redirect based on authentication status
-    if (isAuthenticated()) {
-      navigate('/dashboard');
-    } else {
-      navigate('/login');
-    }
+    const checkAuth = async () => {
+      if (await isAuthenticated()) {
+        navigate('/dashboard');
+      } else {
+        navigate('/login');
+      }
+    };
+    
+    checkAuth();
   }, [navigate]);
   
   return null; // This component will redirect immediately
