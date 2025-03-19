@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from '@/components/ui/use-toast';
-import MainLayout from '@/components/layout/MainLayout';
+import ThreeDLayout from '@/components/layout/3DLayout';
 import { isAuthenticated, getCurrentUserEncryptionKey } from '@/lib/auth';
 import { encryptFile, decryptFile } from '@/lib/encryption';
 
@@ -273,12 +273,12 @@ const Dashboard = () => {
   };
 
   return (
-    <MainLayout>
+    <ThreeDLayout>
       <div className="container py-8 animate-fade-in">
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-medium tracking-tight">My Secure Vault</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-medium tracking-tight text-green-800">My Secure Vault</h1>
+            <p className="text-green-700/80 mt-1">
               All files are end-to-end encrypted
             </p>
           </div>
@@ -286,18 +286,18 @@ const Dashboard = () => {
           <div className="flex items-center gap-2">
             <div className="relative flex-1 md:w-64">
               <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-muted-foreground" />
+                <Search className="h-4 w-4 text-green-600/60" />
               </div>
               <Input
                 placeholder="Search files..."
-                className="pl-10"
+                className="pl-10 border-green-200 focus:ring-green-500"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             
             <label htmlFor="file-upload">
-              <Button as="span" className="gap-2">
+              <Button className="gap-2 bg-green-600 hover:bg-green-700">
                 <FilePlus className="h-4 w-4" />
                 Upload File
                 <input
@@ -314,38 +314,38 @@ const Dashboard = () => {
         </header>
         
         <Tabs defaultValue="all" className="mb-8" onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="all">All Files</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
+          <TabsList className="bg-green-100/80 backdrop-blur-sm">
+            <TabsTrigger value="all" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">All Files</TabsTrigger>
+            <TabsTrigger value="documents" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">Documents</TabsTrigger>
+            <TabsTrigger value="images" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">Images</TabsTrigger>
           </TabsList>
         </Tabs>
         
         {isUploading && (
-          <Card className="mb-4 border-primary/30 bg-primary/5 animate-pulse-subtle">
+          <Card className="mb-4 border-green-200 bg-green-50/70 backdrop-blur-sm animate-pulse-subtle">
             <CardContent className="p-4 flex items-center gap-4">
-              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+              <Loader2 className="h-6 w-6 text-green-600 animate-spin" />
               <div>
-                <p className="font-medium">Encrypting and uploading files...</p>
-                <p className="text-sm text-muted-foreground">This may take a moment depending on file size</p>
+                <p className="font-medium text-green-800">Encrypting and uploading files...</p>
+                <p className="text-sm text-green-700/80">This may take a moment depending on file size</p>
               </div>
             </CardContent>
           </Card>
         )}
         
         {sortedFiles.length === 0 ? (
-          <div className="border border-dashed rounded-lg p-12 text-center bg-muted/20 animate-fade-in">
+          <div className="border border-dashed border-green-200 rounded-lg p-12 text-center bg-white/50 backdrop-blur-sm animate-fade-in">
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                <FolderPlus className="h-8 w-8 text-muted-foreground" />
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center float-animation">
+                <FolderPlus className="h-8 w-8 text-green-600" />
               </div>
             </div>
-            <h3 className="font-medium text-lg mb-2">No files yet</h3>
-            <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+            <h3 className="font-medium text-lg mb-2 text-green-800">No files yet</h3>
+            <p className="text-green-700/80 mb-4 max-w-md mx-auto">
               Upload your first file to start building your secure encrypted storage.
             </p>
             <label htmlFor="file-upload-empty">
-              <Button as="span" size="sm" className="gap-2">
+              <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700">
                 <FilePlus className="h-4 w-4" />
                 Upload File
                 <input
@@ -362,17 +362,17 @@ const Dashboard = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortedFiles.map((file) => (
-              <Card key={file.id} className="overflow-hidden group animate-scale-in hover:border-primary/40 transition-colors">
+              <Card key={file.id} className="overflow-hidden group animate-scale-in hover:border-green-300 transition-colors border-green-100 bg-white/70 backdrop-blur-sm shadow-md leaf-shadow">
                 <CardContent className="p-0">
                   <div className="p-4 flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      {getFileIcon(file.type)}
+                    <div className="flex-shrink-0 float-animation-slow">
+                      {getFileTypeIcon(file.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate text-balance" title={file.name}>
+                      <h3 className="font-medium truncate text-balance text-green-800" title={file.name}>
                         {file.name}
                       </h3>
-                      <div className="flex items-center text-xs text-muted-foreground mt-1 gap-2">
+                      <div className="flex items-center text-xs text-green-700/70 mt-1 gap-2">
                         <span>{formatFileSize(file.size)}</span>
                         <span>•</span>
                         <span>{new Date(file.dateAdded).toLocaleDateString()}</span>
@@ -380,18 +380,18 @@ const Dashboard = () => {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity text-green-700 hover:bg-green-50">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => downloadFile(file.id)}>
+                      <DropdownMenuContent align="end" className="bg-white/90 backdrop-blur-sm border-green-100">
+                        <DropdownMenuItem onClick={() => downloadFile(file.id)} className="text-green-700 focus:text-green-700 focus:bg-green-50">
                           <Download className="h-4 w-4 mr-2" />
                           Download
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => deleteFile(file.id)}
-                          className="text-destructive focus:text-destructive"
+                          className="text-red-500 focus:text-red-500 focus:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
@@ -400,7 +400,7 @@ const Dashboard = () => {
                     </DropdownMenu>
                   </div>
                 </CardContent>
-                <CardFooter className="p-2 bg-muted/50 flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                <CardFooter className="p-2 bg-green-50/80 flex items-center justify-center gap-1 text-xs text-green-700/80">
                   <Lock className="h-3 w-3" />
                   <span>End-to-end encrypted</span>
                 </CardFooter>
@@ -409,8 +409,26 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-    </MainLayout>
+    </ThreeDLayout>
   );
+};
+
+// Helper function to get the appropriate icon for file type with green theme
+const getFileTypeIcon = (fileType: string) => {
+  if (fileType.includes('image/')) return <ImageIcon className="h-8 w-8 text-green-500" />;
+  if (fileType.includes('application/pdf')) return <FileText className="h-8 w-8 text-green-600" />;
+  if (fileType.includes('application/zip') || fileType.includes('application/x-rar-compressed')) {
+    return <FileArchive className="h-8 w-8 text-green-700" />;
+  }
+  return <File className="h-8 w-8 text-green-500" />;
+};
+
+// Format file size
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
 };
 
 export default Dashboard;

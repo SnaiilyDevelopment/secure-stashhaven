@@ -1,33 +1,17 @@
 
 import { toast } from "@/components/ui/use-toast";
 import { deriveKeyFromPassword, encryptText, decryptText } from "./encryption";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock user database (would be replaced with actual API calls)
-const USERS_KEY = 'secure_vault_users';
+// Check if user is authenticated
+export const isAuthenticated = async (): Promise<boolean> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return !!session && !!localStorage.getItem('encryption_key');
+};
 
-interface User {
-  id: string;
-  email: string;
-  passwordHash: string;
-  salt: string;
-  encryptedMasterKey: string;
-  createdAt: string;
-}
-
-// Register a new user
+// Register a new user with email/password
 export const registerUser = async (email: string, password: string): Promise<boolean> => {
   try {
-    // Check if user already exists
-    const existingUsers = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    if (existingUsers.some((user: User) => user.email === email)) {
-      toast({
-        title: "Registration failed",
-        description: "This email is already registered.",
-        variant: "destructive"
-      });
-      return false;
-    }
-
     // Generate a salt and derive a key from the password
     const { key: derivedKey, salt } = await deriveKeyFromPassword(password);
     
@@ -45,22 +29,28 @@ export const registerUser = async (email: string, password: string): Promise<boo
     // Encrypt the master key with the derived key
     const encryptedMasterKey = await encryptText(masterKeyBase64, derivedKey);
     
-    // Create user object
-    const newUser: User = {
-      id: crypto.randomUUID(),
+    // Sign up with Supabase
+    const { error } = await supabase.auth.signUp({
       email,
-      passwordHash: derivedKey, // In a real app, we'd hash the password separately
-      salt,
-      encryptedMasterKey,
-      createdAt: new Date().toISOString()
-    };
+      password,
+      options: {
+        data: {
+          salt,
+          encryptedMasterKey
+        }
+      }
+    });
     
-    // Save user data (would be an API call in a real app)
-    const updatedUsers = [...existingUsers, newUser];
-    localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+    if (error) {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive"
+      });
+      return false;
+    }
     
-    // Store auth token and encryption key
-    localStorage.setItem('auth_token', btoa(newUser.id));
+    // Store encryption key
     localStorage.setItem('encryption_key', masterKeyBase64);
     
     toast({
@@ -80,31 +70,44 @@ export const registerUser = async (email: string, password: string): Promise<boo
   }
 };
 
-// Login a user
+// Login a user with email/password
 export const loginUser = async (email: string, password: string): Promise<boolean> => {
   try {
-    // Find user
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const user = users.find((u: User) => u.email === email);
+    // Sign in with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
     
-    if (!user) {
+    if (error || !data.user) {
       toast({
         title: "Login failed",
-        description: "Invalid email or password.",
+        description: error?.message || "Invalid email or password.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    const salt = data.user.user_metadata.salt;
+    const encryptedMasterKey = data.user.user_metadata.encryptedMasterKey;
+    
+    if (!salt || !encryptedMasterKey) {
+      toast({
+        title: "Login failed",
+        description: "User data is corrupted. Please contact support.",
         variant: "destructive"
       });
       return false;
     }
     
     // Derive key from password with user's salt
-    const { key: derivedKey } = await deriveKeyFromPassword(password, user.salt);
+    const { key: derivedKey } = await deriveKeyFromPassword(password, salt);
     
     try {
       // Attempt to decrypt the master key (this will fail if password is wrong)
-      const masterKeyBase64 = await decryptText(user.encryptedMasterKey, derivedKey);
+      const masterKeyBase64 = await decryptText(encryptedMasterKey, derivedKey);
       
-      // Store auth token and encryption key
-      localStorage.setItem('auth_token', btoa(user.id));
+      // Store encryption key
       localStorage.setItem('encryption_key', masterKeyBase64);
       
       toast({
@@ -133,9 +136,36 @@ export const loginUser = async (email: string, password: string): Promise<boolea
   }
 };
 
-// Check if user is authenticated
-export const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem('auth_token') && !!localStorage.getItem('encryption_key');
+// Sign in with OAuth provider (Google, GitHub, etc.)
+export const signInWithProvider = async (provider: 'google' | 'github'): Promise<boolean> => {
+  try {
+    // Sign in with OAuth provider
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin + '/dashboard'
+      }
+    });
+    
+    if (error) {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("OAuth login error:", error);
+    toast({
+      title: "Login failed",
+      description: "An unexpected error occurred.",
+      variant: "destructive"
+    });
+    return false;
+  }
 };
 
 // Get current user's encryption key
@@ -144,7 +174,7 @@ export const getCurrentUserEncryptionKey = (): string | null => {
 };
 
 // Log out the current user
-export const logoutUser = (): void => {
-  localStorage.removeItem('auth_token');
+export const logoutUser = async (): Promise<void> => {
   localStorage.removeItem('encryption_key');
+  await supabase.auth.signOut();
 };
