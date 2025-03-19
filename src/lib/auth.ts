@@ -1,11 +1,26 @@
 
 import { toast } from "@/components/ui/use-toast";
-import { deriveKeyFromPassword, encryptText, decryptText } from "./encryption";
+import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey } from "./encryption";
 import { supabase } from "@/integrations/supabase/client";
 
 // Check if user is authenticated
 export const isAuthenticated = async (): Promise<boolean> => {
   const { data: { session } } = await supabase.auth.getSession();
+  
+  // For OAuth users (Google/GitHub), we need special handling
+  if (session && (session.user?.app_metadata?.provider === 'github' || 
+                 session.user?.app_metadata?.provider === 'google')) {
+    // If we don't have an encryption key yet, generate one
+    if (!localStorage.getItem('encryption_key')) {
+      console.log("OAuth user authenticated but no encryption key, generating one");
+      const encryptionKey = await generateEncryptionKey();
+      localStorage.setItem('encryption_key', encryptionKey);
+      return true;
+    }
+    return true;
+  }
+  
+  // For email/password users, check both session and encryption key
   return !!session && !!localStorage.getItem('encryption_key');
 };
 
@@ -143,7 +158,7 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin + '/dashboard'
+        redirectTo: window.location.origin
       }
     });
     
