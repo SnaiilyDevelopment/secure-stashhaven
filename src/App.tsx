@@ -37,7 +37,13 @@ const AuthHandler = () => {
             description: "Failed to complete authentication. Please try again.",
             variant: "destructive"
           });
-        } else {
+        } else if (data.session) {
+          // Generate and store encryption key for OAuth users
+          const encryptionKey = btoa(String.fromCharCode(
+            ...new Uint8Array(crypto.getRandomValues(new Uint8Array(32)))
+          ));
+          localStorage.setItem('encryption_key', encryptionKey);
+          
           console.log("Successfully processed OAuth redirect");
           navigate('/dashboard', { replace: true });
         }
@@ -53,21 +59,6 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // Handle hash params from OAuth redirects on initial load
-    if (window.location.hash && window.location.hash.includes('access_token')) {
-      console.log("Found access_token in URL hash, processing...");
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      
-      if (accessToken && refreshToken) {
-        // Store tokens in localStorage for the encryption key check
-        localStorage.setItem('encryption_key', accessToken);
-        window.location.href = '/dashboard';
-        return;
-      }
-    }
-
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session ? "User logged in" : "No session");
