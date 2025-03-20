@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LockKeyhole, User, Settings as SettingsIcon, LogOut, FileIcon, Home } from 'lucide-react';
+import { LockKeyhole, User, Settings as SettingsIcon, LogOut, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import BackgroundScene from '../BackgroundScene';
+import ThreeDBackground from '../3DBackground';
 import { logoutUser } from '@/lib/auth';
 
 interface LayoutProps {
@@ -21,7 +21,7 @@ const ThreeDLayout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col">
       {/* 3D Background */}
-      <BackgroundScene />
+      <ThreeDBackground />
       
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-green-100 sticky top-0 z-10 shadow-sm">
