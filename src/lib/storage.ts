@@ -54,18 +54,22 @@ export const uploadEncryptedFile = async (
     };
     
     // Save metadata to user's file list
-    const { error: metadataError } = await supabase
-      .from('file_metadata')
-      .insert({
-        file_path: data.path,
-        original_name: file.name,
-        original_type: file.type,
-        size: file.size,
-        encrypted: true
-      });
-    
-    if (metadataError) {
-      console.error("Metadata storage error:", metadataError);
+    try {
+      const { error: metadataError } = await supabase
+        .from('file_metadata')
+        .insert({
+          file_path: data.path,
+          original_name: file.name,
+          original_type: file.type,
+          size: file.size,
+          encrypted: true
+        });
+      
+      if (metadataError) {
+        console.error("Metadata storage error:", metadataError);
+      }
+    } catch (metadataError) {
+      console.error("Metadata insertion error:", metadataError);
     }
     
     toast({
@@ -155,12 +159,16 @@ export const deleteFile = async (
     }
     
     // Delete metadata
-    const { error: metadataError } = await supabase
-      .from('file_metadata')
-      .delete()
-      .eq('file_path', filePath);
-    
-    if (metadataError) {
+    try {
+      const { error: metadataError } = await supabase
+        .from('file_metadata')
+        .delete()
+        .eq('file_path', filePath);
+      
+      if (metadataError) {
+        console.error("Metadata deletion error:", metadataError);
+      }
+    } catch (metadataError) {
       console.error("Metadata deletion error:", metadataError);
     }
     
@@ -186,22 +194,27 @@ export const listUserFiles = async (
   bucketName: string = 'secure-files'
 ): Promise<any[]> => {
   try {
-    const { data, error } = await supabase
-      .from('file_metadata')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error("File listing error:", error);
-      toast({
-        title: "Failed to load files",
-        description: error.message,
-        variant: "destructive"
-      });
+    try {
+      const { data, error } = await supabase
+        .from('file_metadata')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error("File listing error:", error);
+        toast({
+          title: "Failed to load files",
+          description: error.message,
+          variant: "destructive"
+        });
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error("File listing query error:", error);
       return [];
     }
-    
-    return data || [];
   } catch (error) {
     console.error("File listing error:", error);
     toast({

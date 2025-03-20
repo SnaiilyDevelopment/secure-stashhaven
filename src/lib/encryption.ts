@@ -31,6 +31,11 @@ export const importEncryptionKey = async (keyBase64: string): Promise<CryptoKey>
   );
 };
 
+// Get the current user's encryption key from localStorage
+export const getCurrentUserEncryptionKey = (): string | null => {
+  return localStorage.getItem('encryption_key');
+};
+
 // Encrypt a file with the user's encryption key
 export const encryptFile = async (file: File, encryptionKey: string): Promise<Blob> => {
   const key = await importEncryptionKey(encryptionKey);

@@ -29,19 +29,19 @@ const AuthHandler = () => {
       console.log("Processing OAuth redirect with hash params");
       
       // Let Supabase handle the hash and session setup
-      const { data, error } = supabase.auth.getSession();
-      
-      if (error) {
-        console.error("Error processing OAuth session:", error);
-        toast({
-          title: "Authentication error",
-          description: "Failed to complete authentication. Please try again.",
-          variant: "destructive"
-        });
-      } else {
-        console.log("Successfully processed OAuth redirect");
-        navigate('/dashboard', { replace: true });
-      }
+      supabase.auth.getSession().then(({ data, error }) => {
+        if (error) {
+          console.error("Error processing OAuth session:", error);
+          toast({
+            title: "Authentication error",
+            description: "Failed to complete authentication. Please try again.",
+            variant: "destructive"
+          });
+        } else {
+          console.log("Successfully processed OAuth redirect");
+          navigate('/dashboard', { replace: true });
+        }
+      });
     }
   }, [location, navigate]);
 
