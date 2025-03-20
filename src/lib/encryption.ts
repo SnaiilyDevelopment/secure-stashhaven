@@ -1,6 +1,7 @@
 
 /**
  * Encryption utilities for end-to-end encryption
+ * Implements secure encryption practices inspired by Matrix E2EE concepts
  */
 
 // Generate a secure encryption key
@@ -44,9 +45,16 @@ export const encryptFile = async (file: File, encryptionKey: string): Promise<Bl
   // Generate a random IV for this encryption
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   
+  // Add additional authentication data for enhanced security
+  const additionalData = new TextEncoder().encode(`file:${file.name}:${file.type}`);
+  
   // Encrypt the file
   const encryptedContent = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { 
+      name: 'AES-GCM', 
+      iv,
+      additionalData // Add additional authenticated data for stronger security
+    },
     key,
     fileArrayBuffer
   );
@@ -61,7 +69,7 @@ export const encryptFile = async (file: File, encryptionKey: string): Promise<Bl
 };
 
 // Decrypt a file with the user's encryption key
-export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, originalType: string): Promise<Blob> => {
+export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, originalType: string, fileName: string = ''): Promise<Blob> => {
   const key = await importEncryptionKey(encryptionKey);
   const encryptedData = await encryptedBlob.arrayBuffer();
   
@@ -71,10 +79,17 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
   // Extract encrypted content (everything after IV)
   const encryptedContent = encryptedData.slice(12);
   
+  // Add additional authentication data for enhanced security
+  const additionalData = new TextEncoder().encode(`file:${fileName}:${originalType}`);
+  
   try {
     // Decrypt the file
     const decryptedContent = await window.crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      { 
+        name: 'AES-GCM', 
+        iv,
+        additionalData: fileName ? additionalData : undefined // Use additionalData if available
+      },
       key,
       encryptedContent
     );
@@ -87,8 +102,8 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
   }
 };
 
-// Encrypt text with the user's encryption key
-export const encryptText = async (text: string, encryptionKey: string): Promise<string> => {
+// Encrypt text with the user's encryption key (enhanced with authentication)
+export const encryptText = async (text: string, encryptionKey: string, context: string = ''): Promise<string> => {
   const key = await importEncryptionKey(encryptionKey);
   const encoder = new TextEncoder();
   const encodedText = encoder.encode(text);
@@ -96,9 +111,16 @@ export const encryptText = async (text: string, encryptionKey: string): Promise<
   // Generate a random IV for this encryption
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   
+  // Add additional authentication data for enhanced security
+  const additionalData = context ? encoder.encode(context) : undefined;
+  
   // Encrypt the text
   const encryptedContent = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { 
+      name: 'AES-GCM', 
+      iv,
+      additionalData 
+    },
     key,
     encodedText
   );
@@ -112,7 +134,7 @@ export const encryptText = async (text: string, encryptionKey: string): Promise<
 };
 
 // Decrypt text with the user's encryption key
-export const decryptText = async (encryptedText: string, encryptionKey: string): Promise<string> => {
+export const decryptText = async (encryptedText: string, encryptionKey: string, context: string = ''): Promise<string> => {
   const key = await importEncryptionKey(encryptionKey);
   const encryptedData = base64ToArrayBuffer(encryptedText);
   
@@ -122,10 +144,17 @@ export const decryptText = async (encryptedText: string, encryptionKey: string):
   // Extract encrypted content (everything after IV)
   const encryptedContent = encryptedData.slice(12);
   
+  // Add additional authentication data for enhanced security
+  const additionalData = context ? new TextEncoder().encode(context) : undefined;
+  
   try {
     // Decrypt the text
     const decryptedContent = await window.crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      { 
+        name: 'AES-GCM', 
+        iv,
+        additionalData 
+      },
       key,
       encryptedContent
     );
@@ -139,8 +168,8 @@ export const decryptText = async (encryptedText: string, encryptionKey: string):
   }
 };
 
-// Utility for deriving encryption key from password
-export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer): Promise<{ key: string, salt: string }> => {
+// Matrix-inspired key derivation with stronger parameters
+export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer | string): Promise<{ key: string, salt: string }> => {
   // Generate a salt if one isn't provided
   if (!salt) {
     salt = window.crypto.getRandomValues(new Uint8Array(16));
@@ -148,7 +177,7 @@ export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer
     salt = base64ToArrayBuffer(salt);
   }
   
-  // Derive a key using PBKDF2
+  // Derive a key using PBKDF2 with higher iteration count for better security
   const keyMaterial = await window.crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -161,7 +190,7 @@ export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer
     {
       name: 'PBKDF2',
       salt,
-      iterations: 100000,
+      iterations: 310000, // Increased from 100000 for stronger security
       hash: 'SHA-256'
     },
     keyMaterial,
@@ -198,9 +227,9 @@ export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return bytes.buffer;
 };
 
-// Generate a secure random password
-export const generateSecurePassword = (length = 16): string => {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_-+=<>?';
+// Generate a secure random password with improved entropy
+export const generateSecurePassword = (length = 20): string => {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_-+=<>?{}[]|:;,.';
   const values = new Uint8Array(length);
   window.crypto.getRandomValues(values);
   
@@ -210,4 +239,61 @@ export const generateSecurePassword = (length = 16): string => {
   }
   
   return password;
+};
+
+// Generate device verification keys (Matrix E2EE inspired)
+export const generateDeviceKeys = async (): Promise<{publicKey: string, privateKey: string}> => {
+  const keyPair = await window.crypto.subtle.generateKey(
+    {
+      name: "ECDH",
+      namedCurve: "P-384", // Using P-384 for stronger security
+    },
+    true,
+    ["deriveKey", "deriveBits"]
+  );
+  
+  const publicKeyExported = await window.crypto.subtle.exportKey(
+    "spki",
+    keyPair.publicKey
+  );
+  
+  const privateKeyExported = await window.crypto.subtle.exportKey(
+    "pkcs8",
+    keyPair.privateKey
+  );
+  
+  return {
+    publicKey: arrayBufferToBase64(publicKeyExported),
+    privateKey: arrayBufferToBase64(privateKeyExported)
+  };
+};
+
+// Import device keys
+export const importDeviceKeys = async (publicKeyBase64: string, privateKeyBase64: string): Promise<{publicKey: CryptoKey, privateKey: CryptoKey}> => {
+  const publicKeyData = base64ToArrayBuffer(publicKeyBase64);
+  const privateKeyData = base64ToArrayBuffer(privateKeyBase64);
+  
+  const publicKey = await window.crypto.subtle.importKey(
+    "spki",
+    publicKeyData,
+    {
+      name: "ECDH",
+      namedCurve: "P-384",
+    },
+    true,
+    []
+  );
+  
+  const privateKey = await window.crypto.subtle.importKey(
+    "pkcs8",
+    privateKeyData,
+    {
+      name: "ECDH",
+      namedCurve: "P-384",
+    },
+    true,
+    ["deriveKey", "deriveBits"]
+  );
+  
+  return { publicKey, privateKey };
 };

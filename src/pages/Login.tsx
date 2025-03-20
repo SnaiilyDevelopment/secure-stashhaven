@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { loginUser, signInWithProvider, isAuthenticated } from '@/lib/auth';
+import ThreeDBackground from '@/components/3DBackground';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -52,8 +53,11 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in bg-gradient-to-b from-[#F2FCE2] to-white">
-      <div className="w-full max-w-md mx-auto">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">
+      {/* 3D Interactive Background */}
+      <ThreeDBackground color="#22c55e" />
+      
+      <div className="w-full max-w-md mx-auto relative z-10">
         <div className="mb-8 text-center">
           <div className="flex justify-center mb-4">
             <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center animate-pulse-subtle">
