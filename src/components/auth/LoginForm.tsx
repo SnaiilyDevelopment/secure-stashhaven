@@ -7,24 +7,77 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loginUser } from '@/lib/auth';
 import OAuthButtons from './OAuthButtons';
+import { toast } from '@/components/ui/use-toast';
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
   const navigate = useNavigate();
+
+  const validateEmail = (email: string): boolean => {
+    if (!email) {
+      setEmailError('Email is required');
+      return false;
+    }
+    
+    if (!EMAIL_REGEX.test(email)) {
+      setEmailError('Please enter a valid email address');
+      return false;
+    }
+    
+    setEmailError('');
+    return true;
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setEmail(newEmail);
+    
+    // Clear error when typing
+    if (emailError) {
+      validateEmail(newEmail);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email before submission
+    if (!validateEmail(email)) {
+      toast({
+        title: "Invalid Email",
+        description: emailError,
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
       const success = await loginUser(email, password);
       if (success) {
+        // Show success toast
+        toast({
+          title: "Login Successful",
+          description: "Welcome back to your secure vault.",
+        });
+        
         // Explicitly navigate to dashboard on successful login
         navigate('/dashboard');
       }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: "Login Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -59,11 +112,14 @@ const LoginForm: React.FC = () => {
                 autoComplete="email"
                 autoCorrect="off"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 border-green-200 focus:ring-green-500"
+                onChange={handleEmailChange}
+                className={`pl-10 border-green-200 focus:ring-green-500 ${emailError ? 'border-red-300' : ''}`}
                 required
               />
             </div>
+            {emailError && (
+              <p className="text-sm text-red-500 mt-1">{emailError}</p>
+            )}
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">

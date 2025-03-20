@@ -6,17 +6,28 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { isAuthenticated } from '@/lib/auth';
 import ThreeDBackground from '@/components/3DBackground';
 import LoginForm from '@/components/auth/LoginForm';
+import { toast } from '@/components/ui/use-toast';
 
 const Login = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
     const checkAuth = async () => {
-      const authenticated = await isAuthenticated();
-      if (authenticated) {
-        navigate('/dashboard');
+      try {
+        const authenticated = await isAuthenticated();
+        if (authenticated) {
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        console.error("Authentication check failed:", error);
+        toast({
+          title: "Authentication Error",
+          description: "There was a problem checking your authentication status.",
+          variant: "destructive"
+        });
       }
     };
+    
     checkAuth();
   }, [navigate]);
 

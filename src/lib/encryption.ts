@@ -4,6 +4,26 @@
  * Implements secure encryption practices inspired by Matrix E2EE concepts
  */
 
+// Utility to convert ArrayBuffer to base64 string
+export const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+
+// Utility to convert base64 string to ArrayBuffer
+export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binaryString = window.atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
 // Generate a secure encryption key
 export const generateEncryptionKey = async (): Promise<string> => {
   const key = await window.crypto.subtle.generateKey(
@@ -35,6 +55,45 @@ export const importEncryptionKey = async (keyBase64: string): Promise<CryptoKey>
 // Get the current user's encryption key from localStorage
 export const getCurrentUserEncryptionKey = (): string | null => {
   return localStorage.getItem('encryption_key');
+};
+
+// Matrix-inspired key derivation with stronger parameters
+export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer | string): Promise<{ key: string, salt: string }> => {
+  // Generate a salt if one isn't provided
+  if (!salt) {
+    salt = window.crypto.getRandomValues(new Uint8Array(16));
+  } else if (typeof salt === 'string') {
+    salt = base64ToArrayBuffer(salt);
+  }
+  
+  // Derive a key using PBKDF2 with higher iteration count for better security
+  const keyMaterial = await window.crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  
+  const derivedKey = await window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 310000, // High iteration count for stronger security
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+  
+  const exportedKey = await window.crypto.subtle.exportKey('raw', derivedKey);
+  
+  return {
+    key: arrayBufferToBase64(exportedKey),
+    salt: arrayBufferToBase64(salt)
+  };
 };
 
 // Encrypt a file with the user's encryption key
@@ -166,65 +225,6 @@ export const decryptText = async (encryptedText: string, encryptionKey: string, 
     console.error('Decryption failed:', error);
     throw new Error('Failed to decrypt text. The encryption key may be incorrect.');
   }
-};
-
-// Matrix-inspired key derivation with stronger parameters
-export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer | string): Promise<{ key: string, salt: string }> => {
-  // Generate a salt if one isn't provided
-  if (!salt) {
-    salt = window.crypto.getRandomValues(new Uint8Array(16));
-  } else if (typeof salt === 'string') {
-    salt = base64ToArrayBuffer(salt);
-  }
-  
-  // Derive a key using PBKDF2 with higher iteration count for better security
-  const keyMaterial = await window.crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits', 'deriveKey']
-  );
-  
-  const derivedKey = await window.crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt,
-      iterations: 310000, // Increased from 100000 for stronger security
-      hash: 'SHA-256'
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  );
-  
-  const exportedKey = await window.crypto.subtle.exportKey('raw', derivedKey);
-  
-  return {
-    key: arrayBufferToBase64(exportedKey),
-    salt: arrayBufferToBase64(salt)
-  };
-};
-
-// Utility to convert ArrayBuffer to base64 string
-export const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return window.btoa(binary);
-};
-
-// Utility to convert base64 string to ArrayBuffer
-export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  const binaryString = window.atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
 };
 
 // Generate a secure random password with improved entropy
