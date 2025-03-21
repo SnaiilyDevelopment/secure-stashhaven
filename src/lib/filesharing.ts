@@ -147,15 +147,15 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
       return [];
     }
     
-    // Get all shares for this file
+    // Get all shares for this file with joined profile data
     const { data, error } = await supabase
       .from('file_shares')
       .select(`
         id,
-        recipient_id,
         permissions,
         created_at,
-        profiles!file_shares_recipient_id_fkey(email)
+        recipient_id,
+        profiles:recipient_id(email)
       `)
       .eq('file_path', filePath)
       .eq('owner_id', user.id);
@@ -165,12 +165,12 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
       return [];
     }
     
-    // Format the response
+    // Format the response with type assertion to ensure permissions is the correct type
     return data.map(share => ({
       id: share.id,
-      email: share.profiles.email,
-      permissions: share.permissions,
-      shared_at: share.created_at
+      email: share.profiles?.email || 'Unknown email',
+      permissions: share.permissions as 'view' | 'edit' | 'admin',
+      shared_at: share.created_at || new Date().toISOString()
     }));
     
   } catch (error) {
@@ -249,7 +249,7 @@ export const getFilesSharedWithMe = async (): Promise<any[]> => {
         permissions,
         created_at,
         owner_id,
-        profiles!file_shares_owner_id_fkey(email),
+        profiles:owner_id(email),
         file_metadata!inner(original_name, original_type, size)
       `)
       .eq('recipient_id', user.id);
@@ -266,9 +266,9 @@ export const getFilesSharedWithMe = async (): Promise<any[]> => {
       original_name: share.file_metadata.original_name,
       original_type: share.file_metadata.original_type,
       size: share.file_metadata.size,
-      permissions: share.permissions,
+      permissions: share.permissions as 'view' | 'edit' | 'admin',
       shared_at: share.created_at,
-      owner_email: share.profiles.email
+      owner_email: share.profiles?.email || 'Unknown owner'
     }));
     
   } catch (error) {
