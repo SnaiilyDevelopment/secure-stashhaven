@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -22,7 +21,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Mail, Shield, Eye, Edit, Star } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import { shareFileWithUser, getFileRecipients, removeFileAccess } from '@/lib/filesharing';
+import { 
+  shareFileWithUser, 
+  getFileRecipients, 
+  removeFileAccess, 
+  FileRecipient 
+} from '@/lib/filesharing';
 
 interface ShareFileDialogProps {
   open: boolean;
