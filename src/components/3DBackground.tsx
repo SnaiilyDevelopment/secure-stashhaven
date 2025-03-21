@@ -227,8 +227,11 @@ const ThreeDBackground: React.FC<ThreeDBackgroundProps> = ({ color = '#10b981' }
       
       // Move objects based on mouse position
       objects.forEach((obj) => {
-        obj.parent?.position.x += mouse.x * 0.01;
-        obj.parent?.position.y += mouse.y * 0.01;
+        // Fixed: Use non-optional chaining for assignment
+        if (obj.parent) {
+          obj.parent.position.x += mouse.x * 0.01;
+          obj.parent.position.y += mouse.y * 0.01;
+        }
       });
       
       // Rotate particles
@@ -248,7 +251,9 @@ const ThreeDBackground: React.FC<ThreeDBackgroundProps> = ({ color = '#10b981' }
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onMouseMove);
-      mountRef.current?.removeChild(renderer.domElement);
+      if (mountRef.current) {
+        mountRef.current.removeChild(renderer.domElement);
+      }
       
       // Dispose geometries and materials
       scene.traverse((object) => {

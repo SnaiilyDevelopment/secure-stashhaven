@@ -1,3 +1,4 @@
+
 /**
  * Encryption utilities for end-to-end encryption
  * Implements secure encryption practices inspired by Matrix E2EE concepts
