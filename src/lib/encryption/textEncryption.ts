@@ -15,6 +15,7 @@ export const encryptText = async (text: string, encryptionKey: string, context: 
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   
   // Add additional authentication data for enhanced security
+  // Fix: Ensure additionalData is properly encoded or undefined
   const additionalData = context ? encoder.encode(context) : undefined;
   
   // Encrypt the text
@@ -22,7 +23,7 @@ export const encryptText = async (text: string, encryptionKey: string, context: 
     { 
       name: 'AES-GCM', 
       iv,
-      additionalData 
+      ...(additionalData ? { additionalData } : {})
     },
     key,
     encodedText
@@ -48,6 +49,7 @@ export const decryptText = async (encryptedText: string, encryptionKey: string, 
   const encryptedContent = encryptedData.slice(12);
   
   // Add additional authentication data for enhanced security
+  // Fix: Ensure additionalData is properly encoded or undefined
   const additionalData = context ? new TextEncoder().encode(context) : undefined;
   
   try {
@@ -56,7 +58,7 @@ export const decryptText = async (encryptedText: string, encryptionKey: string, 
       { 
         name: 'AES-GCM', 
         iv,
-        additionalData 
+        ...(additionalData ? { additionalData } : {})
       },
       key,
       encryptedContent

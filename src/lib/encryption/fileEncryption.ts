@@ -47,8 +47,11 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
   // Extract encrypted content (everything after IV)
   const encryptedContent = encryptedData.slice(12);
   
-  // Add additional authentication data for enhanced security
-  const additionalData = new TextEncoder().encode(`file:${fileName}:${originalType}`);
+  // Fix: Only create additionalData if fileName is provided
+  let additionalData;
+  if (fileName) {
+    additionalData = new TextEncoder().encode(`file:${fileName}:${originalType}`);
+  }
   
   try {
     // Decrypt the file
@@ -56,7 +59,7 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
       { 
         name: 'AES-GCM', 
         iv,
-        additionalData: fileName ? additionalData : undefined // Use additionalData if available
+        ...(additionalData ? { additionalData } : {})
       },
       key,
       encryptedContent
