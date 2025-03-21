@@ -44,36 +44,66 @@ export const registerUser = async (email: string, password: string): Promise<boo
     // Encrypt the master key with the derived key
     const encryptedMasterKey = await encryptText(masterKeyBase64, derivedKey);
     
-    // Sign up with Supabase
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          salt,
-          encryptedMasterKey
+    // Fix: Add error handling for 429 Too Many Requests
+    try {
+      // Sign up with Supabase
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            salt,
+            encryptedMasterKey
+          }
         }
-      }
-    });
-    
-    if (error) {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive"
       });
+      
+      if (error) {
+        // Check if it's a rate limit error
+        if (error.status === 429) {
+          toast({
+            title: "Too many registration attempts",
+            description: "Please wait a moment before trying again.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Registration failed",
+            description: error.message,
+            variant: "destructive"
+          });
+        }
+        return false;
+      }
+      
+      // Store encryption key
+      localStorage.setItem('encryption_key', masterKeyBase64);
+      
+      toast({
+        title: "Registration successful",
+        description: "Your secure vault has been created."
+      });
+      
+      return true;
+    } catch (supabaseError: any) {
+      // Handle rate limiting or other network errors
+      console.error("Supabase registration error:", supabaseError);
+      
+      if (supabaseError.status === 429) {
+        toast({
+          title: "Too many registration attempts",
+          description: "Please wait a moment before trying again.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Registration failed",
+          description: "Network error. Please try again later.",
+          variant: "destructive"
+        });
+      }
       return false;
     }
-    
-    // Store encryption key
-    localStorage.setItem('encryption_key', masterKeyBase64);
-    
-    toast({
-      title: "Registration successful",
-      description: "Your secure vault has been created."
-    });
-    
-    return true;
   } catch (error) {
     console.error("Registration error:", error);
     toast({

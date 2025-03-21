@@ -21,7 +21,7 @@ export const encryptFile = async (file: File, encryptionKey: string): Promise<Bl
     { 
       name: 'AES-GCM', 
       iv,
-      additionalData // Add additional authenticated data for stronger security
+      additionalData // Properly encoded as BufferSource
     },
     key,
     fileArrayBuffer
@@ -48,10 +48,7 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
   const encryptedContent = encryptedData.slice(12);
   
   // Fix: Only create additionalData if fileName is provided
-  let additionalData;
-  if (fileName) {
-    additionalData = new TextEncoder().encode(`file:${fileName}:${originalType}`);
-  }
+  const additionalData = fileName ? new TextEncoder().encode(`file:${fileName}:${originalType}`) : undefined;
   
   try {
     // Decrypt the file

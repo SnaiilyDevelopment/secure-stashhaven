@@ -15,7 +15,7 @@ export const encryptText = async (text: string, encryptionKey: string, context: 
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   
   // Add additional authentication data for enhanced security
-  // Fix: Ensure additionalData is properly encoded or undefined
+  // Fix: Only create additionalData if context is provided
   const additionalData = context ? encoder.encode(context) : undefined;
   
   // Encrypt the text
@@ -49,7 +49,7 @@ export const decryptText = async (encryptedText: string, encryptionKey: string, 
   const encryptedContent = encryptedData.slice(12);
   
   // Add additional authentication data for enhanced security
-  // Fix: Ensure additionalData is properly encoded or undefined
+  // Fix: Only create additionalData if context is provided
   const additionalData = context ? new TextEncoder().encode(context) : undefined;
   
   try {
