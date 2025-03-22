@@ -20,7 +20,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Mail, Shield, Eye, Edit, Star, AlertCircle } from 'lucide-react';
+import { Trash2, Mail, Eye, Edit, Star, AlertCircle, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
 import { 
@@ -47,6 +47,8 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
   const [email, setEmail] = useState('');
   const [permissions, setPermissions] = useState<'view' | 'edit' | 'admin'>('view');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isRemoving, setIsRemoving] = useState<string | null>(null);
   const [recipients, setRecipients] = useState<FileRecipient[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +84,7 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
       return;
     }
 
-    setIsLoading(true);
+    setIsSharing(true);
     setError(null);
     
     try {
@@ -100,12 +102,12 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
       console.error("Error sharing file:", err);
       setError("An unexpected error occurred");
     } finally {
-      setIsLoading(false);
+      setIsSharing(false);
     }
   };
 
   const handleRemoveAccess = async (shareId: string) => {
-    setIsLoading(true);
+    setIsRemoving(shareId);
     try {
       const success = await removeFileAccess(shareId);
       if (success) {
@@ -117,7 +119,7 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
       console.error("Error removing access:", err);
       setError("An unexpected error occurred while removing access");
     } finally {
-      setIsLoading(false);
+      setIsRemoving(null);
     }
   };
 
@@ -163,13 +165,13 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
+              disabled={isSharing}
             />
           </div>
           <Select
             value={permissions}
             onValueChange={(value) => setPermissions(value as 'view' | 'edit' | 'admin')}
-            disabled={isLoading}
+            disabled={isSharing}
           >
             <SelectTrigger className="w-[110px]">
               <SelectValue placeholder="Permissions" />
@@ -180,14 +182,25 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
               <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
-          <Button type="submit" disabled={isLoading} onClick={handleShare}>
-            {isLoading ? "Sharing..." : "Share"}
+          <Button type="submit" disabled={isSharing} onClick={handleShare}>
+            {isSharing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Sharing...
+              </>
+            ) : "Share"}
           </Button>
         </div>
         
-        {recipients.length > 0 && (
-          <div className="mt-4">
-            <h4 className="text-sm font-medium mb-2">People with access</h4>
+        <div className="mt-4">
+          <h4 className="text-sm font-medium mb-2">People with access</h4>
+          
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="ml-2 text-sm">Loading...</span>
+            </div>
+          ) : recipients.length > 0 ? (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {recipients.map((recipient) => (
                 <div 
@@ -209,16 +222,24 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
                     variant="ghost" 
                     size="icon" 
                     onClick={() => handleRemoveAccess(recipient.id)}
-                    disabled={isLoading}
+                    disabled={isRemoving === recipient.id}
                     title="Remove access"
                   >
-                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                    {isRemoving === recipient.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                    )}
                   </Button>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="text-center py-3 text-muted-foreground text-sm bg-secondary/20 rounded-md">
+              No shared access yet
+            </div>
+          )}
+        </div>
         
         <DialogFooter className="sm:justify-end">
           <DialogClose asChild>
