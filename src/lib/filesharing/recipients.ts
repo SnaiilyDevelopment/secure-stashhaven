@@ -21,7 +21,7 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
         permissions,
         created_at,
         recipient_id,
-        profiles(email)
+        profiles:recipient_id(email)
       `)
       .eq('file_path', filePath)
       .eq('owner_id', user.id);

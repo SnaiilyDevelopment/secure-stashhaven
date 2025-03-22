@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -19,10 +20,12 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Mail, Shield, Eye, Edit, Star } from 'lucide-react';
+import { Trash2, Mail, Shield, Eye, Edit, Star, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
 import { 
   shareFileWithUser, 
+  ShareFileError,
   getFileRecipients, 
   removeFileAccess, 
   FileRecipient 
@@ -35,13 +38,6 @@ interface ShareFileDialogProps {
   fileName: string;
 }
 
-interface Recipient {
-  id: string;
-  email: string;
-  permissions: 'view' | 'edit' | 'admin';
-  shared_at: string;
-}
-
 const ShareFileDialog: React.FC<ShareFileDialogProps> = ({ 
   open, 
   onOpenChange, 
@@ -51,19 +47,29 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
   const [email, setEmail] = useState('');
   const [permissions, setPermissions] = useState<'view' | 'edit' | 'admin'>('view');
   const [isLoading, setIsLoading] = useState(false);
-  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [recipients, setRecipients] = useState<FileRecipient[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && filePath) {
       fetchRecipients();
+      setError(null);
     }
   }, [open, filePath]);
 
   const fetchRecipients = async () => {
     if (!filePath) return;
     
-    const fetchedRecipients = await getFileRecipients(filePath);
-    setRecipients(fetchedRecipients);
+    try {
+      setIsLoading(true);
+      const fetchedRecipients = await getFileRecipients(filePath);
+      setRecipients(fetchedRecipients);
+    } catch (err) {
+      console.error("Error fetching recipients:", err);
+      setError("Failed to load current shares");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleShare = async () => {
@@ -77,23 +83,41 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
     }
 
     setIsLoading(true);
+    setError(null);
     
     try {
-      const success = await shareFileWithUser(filePath, email, permissions);
+      const result = await shareFileWithUser(filePath, email, permissions);
       
-      if (success) {
+      if (result.success) {
         setEmail('');
-        fetchRecipients();
+        await fetchRecipients();
+      } else if (result.error === ShareFileError.USER_NOT_FOUND) {
+        setError(`User with email ${email} not found`);
+      } else {
+        setError(result.message);
       }
+    } catch (err) {
+      console.error("Error sharing file:", err);
+      setError("An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRemoveAccess = async (shareId: string) => {
-    const success = await removeFileAccess(shareId);
-    if (success) {
-      fetchRecipients();
+    setIsLoading(true);
+    try {
+      const success = await removeFileAccess(shareId);
+      if (success) {
+        await fetchRecipients();
+      } else {
+        setError("Failed to remove access");
+      }
+    } catch (err) {
+      console.error("Error removing access:", err);
+      setError("An unexpected error occurred while removing access");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -120,6 +144,13 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
         <div className="flex items-end gap-2">
           <div className="grid flex-1 gap-2">
             <Label htmlFor="email" className="sr-only">
@@ -132,11 +163,13 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           <Select
             value={permissions}
             onValueChange={(value) => setPermissions(value as 'view' | 'edit' | 'admin')}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-[110px]">
               <SelectValue placeholder="Permissions" />
@@ -148,14 +181,14 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
             </SelectContent>
           </Select>
           <Button type="submit" disabled={isLoading} onClick={handleShare}>
-            Share
+            {isLoading ? "Sharing..." : "Share"}
           </Button>
         </div>
         
         {recipients.length > 0 && (
           <div className="mt-4">
             <h4 className="text-sm font-medium mb-2">People with access</h4>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-48 overflow-y-auto">
               {recipients.map((recipient) => (
                 <div 
                   key={recipient.id} 
@@ -176,6 +209,7 @@ const ShareFileDialog: React.FC<ShareFileDialogProps> = ({
                     variant="ghost" 
                     size="icon" 
                     onClick={() => handleRemoveAccess(recipient.id)}
+                    disabled={isLoading}
                     title="Remove access"
                   >
                     <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
