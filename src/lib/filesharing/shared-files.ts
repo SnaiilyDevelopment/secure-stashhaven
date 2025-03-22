@@ -22,7 +22,7 @@ export const getFilesSharedWithMe = async (): Promise<SharedFile[]> => {
         permissions,
         created_at,
         owner_id,
-        profiles:owner_id(email),
+        profiles!file_shares_owner_id_fkey(email),
         file_metadata!inner(original_name, original_type, size)
       `)
       .eq('recipient_id', user.id);
