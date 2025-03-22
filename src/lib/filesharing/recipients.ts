@@ -14,15 +14,14 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
     }
     
     // Get all shares for this file with joined profile data
-    // Fix relation by explicitly specifying the foreign key relationship
+    // Use explicit join syntax instead of relying on relationship detection
     const { data, error } = await supabase
       .from('file_shares')
       .select(`
         id,
         permissions,
         created_at,
-        recipient_id,
-        profiles!file_shares_recipient_id_fkey(email)
+        recipient_id
       `)
       .eq('file_path', filePath)
       .eq('owner_id', user.id);
@@ -32,19 +31,30 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
       return [];
     }
     
-    // Format the response with type validation for permissions
-    return data.map(share => {
-      const permission = share.permissions;
-      // Ensure the permission is one of the valid types
-      const validPermission = isValidPermission(permission) ? permission : 'view';
-      
-      return {
-        id: share.id,
-        email: share.profiles?.email || 'Unknown email',
-        permissions: validPermission,
-        shared_at: share.created_at || new Date().toISOString()
-      };
-    });
+    // Fetch profile data in a separate query
+    const recipientsWithProfiles = await Promise.all(
+      data.map(async (share) => {
+        // Get the recipient's email from the profiles table
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', share.recipient_id)
+          .single();
+        
+        const permission = share.permissions;
+        // Ensure the permission is one of the valid types
+        const validPermission = isValidPermission(permission) ? permission : 'view';
+        
+        return {
+          id: share.id,
+          email: profileData?.email || 'Unknown email',
+          permissions: validPermission,
+          shared_at: share.created_at || new Date().toISOString()
+        };
+      })
+    );
+    
+    return recipientsWithProfiles;
     
   } catch (error) {
     console.error("Error fetching file recipients:", error);
