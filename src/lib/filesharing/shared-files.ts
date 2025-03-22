@@ -14,6 +14,7 @@ export const getFilesSharedWithMe = async (): Promise<SharedFile[]> => {
     }
     
     // Get all files shared with the current user
+    // Fix relation by explicitly specifying the foreign key relationship
     const { data, error } = await supabase
       .from('file_shares')
       .select(`

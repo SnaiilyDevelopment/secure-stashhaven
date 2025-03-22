@@ -1,257 +1,175 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { isValidPermission } from "./types";
 
-/**
- * Error types for shareFileWithUser
- */
 export enum ShareFileError {
   USER_NOT_FOUND = "USER_NOT_FOUND",
-  NOT_AUTHENTICATED = "NOT_AUTHENTICATED",
-  FILE_NOT_FOUND = "FILE_NOT_FOUND",
-  SHARE_UPDATE_FAILED = "SHARE_UPDATE_FAILED",
-  SHARE_CREATE_FAILED = "SHARE_CREATE_FAILED",
-  UNKNOWN_ERROR = "UNKNOWN_ERROR"
+  ALREADY_SHARED = "ALREADY_SHARED",
+  SERVER_ERROR = "SERVER_ERROR",
+  INVALID_PERMISSIONS = "INVALID_PERMISSIONS",
+  INVALID_FILE = "INVALID_FILE"
 }
 
-/**
- * Result of shareFileWithUser operation
- */
-export interface ShareFileResult {
+export type ShareFileResult = {
   success: boolean;
-  message: string;
   error?: ShareFileError;
-}
+  message?: string;
+  shareId?: string;
+};
 
 /**
- * Share a file with another user by their email
+ * Share a file with another user
+ * @param filePath Path to the file in storage
+ * @param recipientEmail Email of the user to share with
+ * @param permissions Permission level ('view', 'edit', 'admin')
+ * @returns Result object containing success flag and any error information
  */
 export const shareFileWithUser = async (
   filePath: string,
-  userEmail: string,
-  permissions: 'view' | 'edit' | 'admin' = 'view'
+  recipientEmail: string,
+  permissions: 'view' | 'edit' | 'admin'
 ): Promise<ShareFileResult> => {
   try {
-    // Validate params
+    // Validate input
     if (!filePath) {
-      return {
-        success: false,
-        message: "Invalid file path",
-        error: ShareFileError.FILE_NOT_FOUND
-      };
-    }
-
-    if (!userEmail) {
-      return {
-        success: false,
-        message: "Email is required",
-        error: ShareFileError.USER_NOT_FOUND
-      };
-    }
-
-    if (!isValidPermission(permissions)) {
-      permissions = 'view'; // Default to view if invalid permission
-    }
-
-    // First check if the user exists
-    const { data: userList, error: userError } = await supabase
-      .from('profiles')
-      .select('id, email')
-      .eq('email', userEmail)
-      .limit(1);
-    
-    if (userError) {
-      console.error("Error checking user:", userError);
-      toast({
-        title: "Database error",
-        description: "Failed to check if user exists.",
-        variant: "destructive"
-      });
-      return {
+      return { 
         success: false, 
-        message: "Failed to check if user exists",
-        error: ShareFileError.UNKNOWN_ERROR
+        error: ShareFileError.INVALID_FILE,
+        message: "File path is required" 
       };
     }
     
-    if (!userList || userList.length === 0) {
-      toast({
-        title: "User not found",
-        description: "The email address you entered does not belong to any user.",
-        variant: "destructive"
-      });
-      return {
+    if (!recipientEmail) {
+      return { 
         success: false, 
-        message: "User not found",
-        error: ShareFileError.USER_NOT_FOUND
+        error: ShareFileError.USER_NOT_FOUND,
+        message: "Recipient email is required" 
       };
     }
     
-    const recipientId = userList[0].id;
-    
-    // Get the current user's ID
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error:", authError);
-      toast({
-        title: "Authentication error",
-        description: "Failed to get current user information.",
-        variant: "destructive"
-      });
-      return {
+    if (!['view', 'edit', 'admin'].includes(permissions)) {
+      return { 
         success: false, 
-        message: "Authentication error",
-        error: ShareFileError.NOT_AUTHENTICATED
+        error: ShareFileError.INVALID_PERMISSIONS,
+        message: "Invalid permission level" 
       };
     }
     
-    if (!user) {
-      toast({
-        title: "Authentication error",
-        description: "You must be logged in to share files.",
-        variant: "destructive"
-      });
-      return {
-        success: false, 
-        message: "Not authenticated",
-        error: ShareFileError.NOT_AUTHENTICATED
-      };
-    }
-    
-    // Check if this file belongs to the current user
-    const { data: fileData, error: fileError } = await supabase
+    // Check if file exists
+    const { data: fileCheck, error: fileError } = await supabase
       .from('file_metadata')
-      .select('*')
+      .select('file_path')
       .eq('file_path', filePath)
-      .limit(1);
+      .maybeSingle();
       
-    if (fileError) {
-      console.error("Error checking file:", fileError);
-      toast({
-        title: "Database error",
-        description: "Failed to check file information.",
-        variant: "destructive"
-      });
-      return {
+    if (fileError || !fileCheck) {
+      console.error("File check error:", fileError);
+      return { 
         success: false, 
-        message: "Database error when checking file",
-        error: ShareFileError.UNKNOWN_ERROR
+        error: ShareFileError.INVALID_FILE,
+        message: "File not found" 
       };
     }
     
-    if (!fileData || fileData.length === 0) {
-      toast({
-        title: "File not found",
-        description: "The file you're trying to share doesn't exist or you don't have access to it.",
-        variant: "destructive"
-      });
-      return {
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { 
         success: false, 
-        message: "File not found",
-        error: ShareFileError.FILE_NOT_FOUND
+        error: ShareFileError.SERVER_ERROR,
+        message: "Authentication required" 
       };
     }
     
-    // Check if the file is already shared with this user
-    const { data: existingShare, error: shareError } = await supabase
+    // Get recipient user ID
+    const { data: recipientData, error: recipientError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', recipientEmail)
+      .maybeSingle();
+      
+    if (recipientError || !recipientData) {
+      console.error("Recipient lookup error:", recipientError);
+      return { 
+        success: false, 
+        error: ShareFileError.USER_NOT_FOUND,
+        message: `User with email ${recipientEmail} not found` 
+      };
+    }
+    
+    // Check if already shared
+    const { data: existingShare, error: shareCheckError } = await supabase
       .from('file_shares')
-      .select('*')
+      .select('id')
       .eq('file_path', filePath)
-      .eq('recipient_id', recipientId)
-      .limit(1);
+      .eq('owner_id', user.id)
+      .eq('recipient_id', recipientData.id)
+      .maybeSingle();
       
-    if (shareError) {
-      console.error("Error checking existing share:", shareError);
-      toast({
-        title: "Database error",
-        description: "Failed to check existing shares.",
-        variant: "destructive"
-      });
-      return {
+    if (shareCheckError) {
+      console.error("Share check error:", shareCheckError);
+      return { 
         success: false, 
-        message: "Database error when checking existing shares",
-        error: ShareFileError.UNKNOWN_ERROR
+        error: ShareFileError.SERVER_ERROR,
+        message: "Failed to check existing shares" 
       };
     }
     
-    if (existingShare && existingShare.length > 0) {
-      // Update existing share permissions
+    if (existingShare) {
+      // Update existing share
       const { error: updateError } = await supabase
         .from('file_shares')
         .update({ permissions })
-        .eq('id', existingShare[0].id);
+        .eq('id', existingShare.id);
         
       if (updateError) {
-        console.error("Error updating share:", updateError);
-        toast({
-          title: "Error updating share",
-          description: updateError.message,
-          variant: "destructive"
-        });
-        return {
+        console.error("Share update error:", updateError);
+        return { 
           success: false, 
-          message: "Failed to update share permissions",
-          error: ShareFileError.SHARE_UPDATE_FAILED
+          error: ShareFileError.SERVER_ERROR,
+          message: "Failed to update share permissions" 
         };
       }
       
-      toast({
-        title: "Share updated",
-        description: `Share permissions updated for ${userEmail}`,
-      });
-      
-      return {
+      return { 
         success: true,
-        message: `Share permissions updated for ${userEmail}`
+        shareId: existingShare.id,
+        message: `Updated share permissions for ${recipientEmail}` 
       };
     }
     
-    // Create a new share
-    const { error: insertError } = await supabase
+    // Create new share
+    const { data: newShare, error: insertError } = await supabase
       .from('file_shares')
       .insert({
         file_path: filePath,
         owner_id: user.id,
-        recipient_id: recipientId,
+        recipient_id: recipientData.id,
         permissions
-      });
+      })
+      .select('id')
+      .single();
       
-    if (insertError) {
-      console.error("Error sharing file:", insertError);
-      toast({
-        title: "Error sharing file",
-        description: insertError.message,
-        variant: "destructive"
-      });
-      return {
+    if (insertError || !newShare) {
+      console.error("Share creation error:", insertError);
+      return { 
         success: false, 
-        message: "Failed to share file",
-        error: ShareFileError.SHARE_CREATE_FAILED
+        error: ShareFileError.SERVER_ERROR,
+        message: "Failed to create share" 
       };
     }
     
-    toast({
-      title: "File shared",
-      description: `File successfully shared with ${userEmail}`,
-    });
-    
-    return {
+    return { 
       success: true,
-      message: `File successfully shared with ${userEmail}`
+      shareId: newShare.id,
+      message: `Successfully shared with ${recipientEmail}` 
     };
     
   } catch (error) {
-    console.error("File sharing error:", error);
-    toast({
-      title: "Sharing failed",
-      description: "An unexpected error occurred while sharing the file.",
-      variant: "destructive"
-    });
-    return {
+    console.error("Share file error:", error);
+    return { 
       success: false, 
-      message: "Unknown error occurred",
-      error: ShareFileError.UNKNOWN_ERROR
+      error: ShareFileError.SERVER_ERROR,
+      message: "An unexpected error occurred" 
     };
   }
 };

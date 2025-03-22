@@ -16,7 +16,14 @@ import { isAuthenticated } from "./lib/auth";
 import { supabase } from "./integrations/supabase/client";
 import { toast } from "./components/ui/use-toast";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Handle the OAuth redirect and hash fragment
 const AuthHandler = () => {
@@ -59,37 +66,47 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session ? "User logged in" : "No session");
-      
-      // For OAuth logins, generate and store encryption key when user first signs in
-      if (session && !localStorage.getItem('encryption_key') && 
-          (session.user?.app_metadata?.provider === 'github' || 
-           session.user?.app_metadata?.provider === 'google')) {
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    // Set up auth state listener first
+    const setupAuthListener = async () => {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("Auth state changed:", event, session ? "User logged in" : "No session");
         
-        console.log("OAuth login detected, generating encryption key");
-        // Create a random encryption key for OAuth users
-        const encryptionKey = btoa(String.fromCharCode(
-          ...new Uint8Array(await window.crypto.getRandomValues(new Uint8Array(32)))
-        ));
-        localStorage.setItem('encryption_key', encryptionKey);
-      }
+        // For OAuth logins, generate and store encryption key when user first signs in
+        if (session && !localStorage.getItem('encryption_key') && 
+            (session.user?.app_metadata?.provider === 'github' || 
+            session.user?.app_metadata?.provider === 'google')) {
+          
+          console.log("OAuth login detected, generating encryption key");
+          // Create a random encryption key for OAuth users
+          const encryptionKey = btoa(String.fromCharCode(
+            ...new Uint8Array(await window.crypto.getRandomValues(new Uint8Array(32)))
+          ));
+          localStorage.setItem('encryption_key', encryptionKey);
+        }
+        
+        const authenticated = await isAuthenticated();
+        console.log("isAuthenticated returned:", authenticated);
+        setIsLoggedIn(authenticated);
+        setIsReady(true);
+        
+        // Force navigation to dashboard on login events
+        if (authenticated && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+          window.location.href = '/dashboard';
+        }
+      });
       
-      const authenticated = await isAuthenticated();
-      console.log("isAuthenticated returned:", authenticated);
-      setIsLoggedIn(authenticated);
-      setIsReady(true);
-      
-      // Force navigation to dashboard on login events
-      if (authenticated && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
-        window.location.href = '/dashboard';
-      }
-    });
+      subscription = data.subscription;
+    };
     
-    // Check initial auth state
+    // Check initial auth state after setting up listener
     const checkAuth = async () => {
-      const authenticated = await isAuthenticated();
+      await setupAuthListener();
+      
+      // Initial session check
+      const { data: { session } } = await supabase.auth.getSession();
+      const authenticated = session ? await isAuthenticated() : false;
       console.log("Initial auth check:", authenticated);
       setIsLoggedIn(authenticated);
       setIsReady(true);
@@ -99,7 +116,9 @@ const App = () => {
     
     // Cleanup subscription on unmount
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 

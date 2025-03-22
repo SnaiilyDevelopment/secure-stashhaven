@@ -14,6 +14,7 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
     }
     
     // Get all shares for this file with joined profile data
+    // Fix relation by explicitly specifying the foreign key relationship
     const { data, error } = await supabase
       .from('file_shares')
       .select(`
