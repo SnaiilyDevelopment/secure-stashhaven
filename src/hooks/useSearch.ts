@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 
 /**
@@ -13,16 +12,23 @@ export const useSearch = (initialQuery: string = '') => {
     setSearchQuery(query);
   }, []);
 
-  const filterBySearchTerm = useCallback(<T extends { name: string }>(
+  const filterBySearchTerm = useCallback(<T extends object>(
     items: T[],
-    searchTerm: string
+    searchTerm: string,
+    propertyToSearch: keyof T | ((item: T) => string) = 'name' as keyof T
   ): T[] => {
     if (!searchTerm) return items;
     
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    return items.filter(item => 
-      item.name.toLowerCase().includes(lowerCaseSearchTerm)
-    );
+    
+    return items.filter(item => {
+      if (typeof propertyToSearch === 'function') {
+        return propertyToSearch(item).toLowerCase().includes(lowerCaseSearchTerm);
+      }
+      
+      const value = item[propertyToSearch];
+      return typeof value === 'string' && value.toLowerCase().includes(lowerCaseSearchTerm);
+    });
   }, []);
 
   return {

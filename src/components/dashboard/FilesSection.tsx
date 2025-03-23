@@ -28,9 +28,19 @@ const FilesSection: React.FC<FilesSectionProps> = ({
   const [activeTab, setActiveTab] = useState<'my-files' | 'shared-with-me'>('my-files');
   const { filterBySearchTerm } = useSearch();
   
-  // Filter files based on search term
-  const filteredFiles = filterBySearchTerm(files, searchTerm);
-  const filteredSharedFiles = filterBySearchTerm(sharedFiles, searchTerm);
+  // Filter files based on search term, using original_name property
+  const filteredFiles = filterBySearchTerm(
+    files, 
+    searchTerm, 
+    (file) => file.original_name
+  );
+  
+  // Filter shared files based on search term, using original_name property
+  const filteredSharedFiles = filterBySearchTerm(
+    sharedFiles, 
+    searchTerm, 
+    (file) => file.original_name
+  );
 
   // Convert FileMetadata to FileItemAdapter using our adapter
   const adaptedFiles = filteredFiles.map(adaptFileMetadataToFileItem);
