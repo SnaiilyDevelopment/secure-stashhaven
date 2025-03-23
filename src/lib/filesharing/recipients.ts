@@ -13,9 +13,12 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
       return [];
     }
     
-    // Get all shares for this file - use raw SQL query with proper joins
+    // Get all shares for this file using RPC function
     const { data, error } = await supabase
-      .rpc('get_file_recipients', { file_path_param: filePath, owner_id_param: user.id });
+      .rpc('get_file_recipients', { 
+        file_path_param: filePath, 
+        owner_id_param: user.id 
+      });
       
     if (error || !data) {
       console.error("Error fetching file recipients:", error);
@@ -55,9 +58,12 @@ export const removeFileAccess = async (shareId: string): Promise<boolean> => {
       return false;
     }
     
-    // Use a stored procedure or a direct delete query
-    const { error } = await supabase
-      .rpc('remove_file_access', { share_id_param: shareId, owner_id_param: user.id });
+    // Use RPC function to remove access
+    const { data, error } = await supabase
+      .rpc('remove_file_access', { 
+        share_id_param: shareId, 
+        owner_id_param: user.id 
+      });
       
     if (error) {
       console.error("Error removing file access:", error);

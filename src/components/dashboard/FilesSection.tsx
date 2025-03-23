@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
 import SearchBar from './SearchBar';
-import { SharedFile, FileMetadata, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/types';
+import { FileItemAdapter, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/types';
+import { FileMetadata } from '@/lib/storage';
+import { SharedFile } from '@/lib/filesharing';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -33,10 +35,10 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     file.original_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Convert FileMetadata to FileItem using our adapter
+  // Convert FileMetadata to FileItemAdapter using our adapter
   const adaptedFiles = filteredFiles.map(adaptFileMetadataToFileItem);
   
-  // Convert SharedFile to FileItem using our adapter
+  // Convert SharedFile to FileItemAdapter using our adapter
   const adaptedSharedFiles = filteredSharedFiles.map(adaptSharedFileToFileItem);
 
   return (

@@ -34,7 +34,9 @@ export interface Profile {
   created_at?: string;
 }
 
-// Add necessary database tables
+/**
+ * Interface for file share database table
+ */
 export interface FileShareTable {
   id: string;
   file_path: string;

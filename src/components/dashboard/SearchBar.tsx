@@ -4,14 +4,14 @@ import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface SearchBarProps {
-  value: string;
+  value?: string;
   onChange: (query: string) => void;
-  searchQuery?: string; // Add this for backward compatibility
+  searchQuery?: string;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, searchQuery }) => {
-  // Use searchQuery as fallback if provided
-  const inputValue = searchQuery !== undefined ? searchQuery : value;
+  // Use searchQuery as fallback for backward compatibility
+  const inputValue = value !== undefined ? value : (searchQuery || '');
   
   return (
     <div className="relative flex-1 md:w-64">

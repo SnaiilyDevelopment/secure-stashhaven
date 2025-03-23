@@ -97,7 +97,7 @@ export const shareFileWithUser = async (
       };
     }
     
-    if (!data || !data.share_id) {
+    if (!data || !data[0] || !data[0].share_id) {
       return { 
         success: false, 
         error: ShareFileError.SERVER_ERROR,
@@ -107,7 +107,7 @@ export const shareFileWithUser = async (
     
     return { 
       success: true,
-      shareId: data.share_id,
+      shareId: data[0].share_id,
       message: `Successfully shared with ${recipientEmail}` 
     };
     
