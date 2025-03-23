@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
 import SearchBar from './SearchBar';
-import { FileItemAdapter, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/types';
+import { FileItemAdapter, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/adapters/fileAdapter';
 import { FileMetadata } from '@/lib/storage';
 import { SharedFile } from '@/lib/filesharing';
+import { useSearch } from '@/hooks/useSearch';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -25,15 +26,11 @@ const FilesSection: React.FC<FilesSectionProps> = ({
   onRefresh
 }) => {
   const [activeTab, setActiveTab] = useState<'my-files' | 'shared-with-me'>('my-files');
+  const { filterBySearchTerm } = useSearch();
   
   // Filter files based on search term
-  const filteredFiles = files.filter(file => 
-    file.original_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  const filteredSharedFiles = sharedFiles.filter(file => 
-    file.original_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFiles = filterBySearchTerm(files, searchTerm);
+  const filteredSharedFiles = filterBySearchTerm(sharedFiles, searchTerm);
 
   // Convert FileMetadata to FileItemAdapter using our adapter
   const adaptedFiles = filteredFiles.map(adaptFileMetadataToFileItem);
