@@ -11,3 +11,9 @@ export {
   getFileMetadata,
   type FileMetadata
 } from './fileManagement';
+
+export {
+  getUserStorageUsage,
+  formatBytes,
+  ensureStorageBucket
+} from './storageUtils';

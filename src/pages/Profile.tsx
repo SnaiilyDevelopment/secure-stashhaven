@@ -1,311 +1,214 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  User, 
-  Mail, 
-  Shield, 
-  KeyRound, 
-  AlertTriangle, 
-  Loader2, 
-  CheckCircle,
-  Copy,
-  EyeOff
-} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
-import MainLayout from '@/components/layout/MainLayout';
-import { isAuthenticated, getCurrentUserEncryptionKey } from '@/lib/auth';
-import { generateSecurePassword } from '@/lib/encryption';
+import ThreeDLayout from '@/components/layout/3DLayout';
+import { User, Mail, Shield, HardDrive, Database, FileText } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { getUserStorageUsage, formatBytes } from '@/lib/storage/storageUtils';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  providers: string[];
+  created_at: string;
+}
 
 const Profile = () => {
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [recoveryKey, setRecoveryKey] = useState<string>('');
-  const [isGeneratingKey, setIsGeneratingKey] = useState<boolean>(false);
-  const [showRecoveryKey, setShowRecoveryKey] = useState<boolean>(false);
-  const navigate = useNavigate();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [storageUsage, setStorageUsage] = useState({ totalSize: 0, fileCount: 0 });
+  
+  // Storage limit in bytes (1GB)
+  const storageLimit = 1 * 1024 * 1024 * 1024;
+  
+  // Calculate storage usage percentage
+  const usagePercentage = Math.min(100, (storageUsage.totalSize / storageLimit) * 100);
   
   useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-      return;
-    }
-    
-    // Get user email
-    try {
-      const authToken = localStorage.getItem('auth_token');
-      if (!authToken) return;
-      
-      const userId = atob(authToken);
-      const users = JSON.parse(localStorage.getItem('secure_vault_users') || '[]');
-      const user = users.find((u: any) => u.id === userId);
-      
-      if (user) {
-        setUserEmail(user.email);
-      }
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
-  }, [navigate]);
-  
-  const generateRecoveryKey = async () => {
-    setIsGeneratingKey(true);
-    
-    try {
-      // In a real app, we would generate a recovery key that can be used to recover the account
-      // For this demo, we'll just generate a secure password
-      const key = generateSecurePassword(24);
-      setRecoveryKey(key);
-      setShowRecoveryKey(true);
-      
-      // In a real app, we would store this recovery key (encrypted) on the server
-      
-      toast({
-        title: "Recovery key generated",
-        description: "Please save this key in a secure location. It can be used to recover your account if you lose your password.",
-      });
-    } catch (error) {
-      console.error('Error generating recovery key:', error);
-      toast({
-        title: "Failed to generate recovery key",
-        description: "An unexpected error occurred.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsGeneratingKey(false);
-    }
-  };
-  
-  const copyRecoveryKey = () => {
-    navigator.clipboard.writeText(recoveryKey);
-    toast({
-      title: "Recovery key copied",
-      description: "The recovery key has been copied to your clipboard.",
-    });
-  };
-  
-  const calculateStorageUsed = () => {
-    try {
-      const files = JSON.parse(localStorage.getItem('encrypted_files') || '[]');
-      const totalBytes = files.reduce((total: number, file: any) => total + file.size, 0);
-      
-      return formatFileSize(totalBytes);
-    } catch (error) {
-      console.error('Error calculating storage used:', error);
-      return '0 B';
-    }
-  };
-  
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
-  };
-  
-  const getFileCount = () => {
-    try {
-      const files = JSON.parse(localStorage.getItem('encrypted_files') || '[]');
-      return files.length;
-    } catch (error) {
-      console.error('Error getting file count:', error);
-      return 0;
-    }
-  };
-
-  return (
-    <MainLayout>
-      <div className="container py-8 max-w-4xl mx-auto animate-fade-in">
-        <header className="mb-8">
-          <h1 className="text-3xl font-medium tracking-tight">My Profile</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your account and security
-          </p>
-        </header>
+    const fetchUserProfile = async () => {
+      try {
+        setIsLoading(true);
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Information</CardTitle>
-                <CardDescription>
-                  Your basic account details
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-muted/30 rounded-lg">
-                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-8 w-8 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-medium">{userEmail}</h3>
-                    <p className="text-muted-foreground text-sm">Joined {new Date().toLocaleDateString()}</p>
-                  </div>
-                </div>
-                
-                <div className="border rounded-lg divide-y">
-                  <div className="flex justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <h4 className="font-medium">Email Address</h4>
-                        <p className="text-sm text-muted-foreground">Your primary email</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p>{userEmail}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <KeyRound className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <h4 className="font-medium">Password</h4>
-                        <p className="text-sm text-muted-foreground">Your secure password</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p>••••••••••</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Security & Recovery</CardTitle>
-                <CardDescription>
-                  Protect your account and encrypted data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-amber-800 dark:text-amber-300">Important Security Information</h4>
-                      <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                        Your files are protected with end-to-end encryption. If you lose your password, 
-                        you may not be able to recover your data without a recovery key.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-start gap-3 mb-4">
-                    <Shield className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium">Recovery Key</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Generate a recovery key to regain access to your encrypted files if you lose your password.
-                        Keep this key in a safe place.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {recoveryKey ? (
-                    <div className="mt-4">
-                      <div className="relative">
-                        <div className="p-3 rounded bg-muted font-mono text-sm break-all">
-                          {showRecoveryKey ? recoveryKey : '•'.repeat(24)}
-                        </div>
-                        <div className="absolute right-2 top-2 flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => setShowRecoveryKey(!showRecoveryKey)}
-                            className="h-8 w-8"
-                          >
-                            <EyeOff className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={copyRecoveryKey}
-                            className="h-8 w-8"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                        Recovery key generated. Save this in a secure location.
-                      </p>
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={generateRecoveryKey}
-                      disabled={isGeneratingKey}
-                      className="mt-2"
-                    >
-                      {isGeneratingKey ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          Generate Recovery Key
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Storage Statistics</CardTitle>
-                <CardDescription>
-                  Your secure storage usage
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Storage Used</h4>
-                    <p className="text-2xl font-medium">{calculateStorageUsed()}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Encrypted Files</h4>
-                    <p className="text-2xl font-medium">{getFileCount()}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Encryption Status</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                      <p className="text-sm">Active and Secured</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          throw new Error("User not found");
+        }
+        
+        // Get user's storage usage
+        const usage = await getUserStorageUsage();
+        
+        setProfile({
+          id: user.id,
+          email: user.email || 'No email',
+          providers: [user.app_metadata.provider || 'email'],
+          created_at: user.created_at || new Date().toISOString(),
+        });
+        
+        setStorageUsage(usage);
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load profile information.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUserProfile();
+  }, []);
+  
+  if (isLoading) {
+    return (
+      <ThreeDLayout>
+        <div className="container flex items-center justify-center py-24">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-16 w-16 rounded-full bg-green-100"></div>
+            <div className="h-6 w-40 bg-green-100 rounded mt-4"></div>
+            <div className="h-4 w-60 bg-green-100 rounded mt-2"></div>
           </div>
         </div>
+      </ThreeDLayout>
+    );
+  }
+  
+  if (!profile) {
+    return (
+      <ThreeDLayout>
+        <div className="container py-8">
+          <Card>
+            <CardContent className="py-8">
+              <div className="text-center">
+                <User className="h-12 w-12 mx-auto text-gray-400" />
+                <h2 className="mt-2 text-xl font-medium">Profile Not Available</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Please log in to view your profile.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </ThreeDLayout>
+    );
+  }
+  
+  return (
+    <ThreeDLayout>
+      <div className="container py-8 animate-fade-in">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-medium tracking-tight text-green-800">My Profile</h1>
+            <p className="text-green-700/80 mt-1">Manage your account information</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Profile Card */}
+          <Card className="lg:col-span-1">
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src="" alt={profile.email} />
+                  <AvatarFallback className="text-2xl bg-green-100 text-green-800">
+                    {profile.email.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <CardTitle>{profile.email}</CardTitle>
+              <CardDescription>
+                User since {new Date(profile.created_at).toLocaleDateString()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-green-600" />
+                  <span>{profile.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Shield className="h-4 w-4 text-green-600" />
+                  <span>Auth Provider: {profile.providers[0]}</span>
+                </div>
+                <Button variant="outline" className="w-full mt-4">
+                  Edit Profile
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Storage Usage Card */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-5 w-5 text-green-600" />
+                <CardTitle>Storage Usage</CardTitle>
+              </div>
+              <CardDescription>
+                Your storage usage information
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>{formatBytes(storageUsage.totalSize)} used</span>
+                    <span>{formatBytes(storageLimit)} total</span>
+                  </div>
+                  <Progress value={usagePercentage} className="h-3" />
+                </div>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-6 w-6 text-green-600" />
+                      <div>
+                        <div className="text-2xl font-semibold">
+                          {storageUsage.fileCount}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Files Stored
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Database className="h-6 w-6 text-green-600" />
+                      <div>
+                        <div className="text-2xl font-semibold">
+                          {formatBytes(storageLimit - storageUsage.totalSize)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Available Storage
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {usagePercentage > 80 && (
+                  <div className="p-4 bg-amber-50 rounded-md border border-amber-200">
+                    <p className="text-amber-800">
+                      <strong>Note:</strong> You are approaching your storage limit. 
+                      Consider removing unused files to free up space.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </MainLayout>
+    </ThreeDLayout>
   );
 };
 

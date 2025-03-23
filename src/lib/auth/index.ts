@@ -6,17 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 // Check if user is authenticated
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
-    // Add a timeout for the session check
-    const sessionPromise = supabase.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Session check timed out")), 3000);
-    });
-    
-    const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise])
-      .catch(error => {
-        console.error("Session check timed out:", error);
-        return { data: { session: null } };
-      }) as any;
+    // Simplify auth check by checking both session and encryption key
+    const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
       console.log("No session found, user not authenticated");

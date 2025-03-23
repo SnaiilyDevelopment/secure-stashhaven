@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, KeyRound, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { loginUser } from '@/lib/auth';
 import OAuthButtons from './OAuthButtons';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -18,7 +19,39 @@ const LoginForm: React.FC = () => {
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // Clear any existing session if the user is on the login page
+  useEffect(() => {
+    // Check for redirect message in the URL
+    const params = new URLSearchParams(location.search);
+    const message = params.get('message');
+    
+    if (message === 'session_expired') {
+      toast({
+        title: "Session Expired",
+        description: "Your session has expired. Please log in again.",
+        variant: "default"
+      });
+    }
+    
+    // If user navigated to login page, clear auth state
+    const clearAuth = async () => {
+      try {
+        // Only sign out if there is actually a session
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          await supabase.auth.signOut();
+          localStorage.removeItem('encryption_key');
+        }
+      } catch (error) {
+        console.error("Error clearing authentication:", error);
+      }
+    };
+    
+    clearAuth();
+  }, [location]);
+  
   const validateEmail = (email: string): boolean => {
     if (!email) {
       setEmailError('Email is required');

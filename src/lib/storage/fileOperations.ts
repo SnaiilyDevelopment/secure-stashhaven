@@ -7,9 +7,12 @@ import { encryptFile, decryptFile, getCurrentUserEncryptionKey } from "../encryp
 export const uploadEncryptedFile = async (
   file: File,
   bucketName: string = 'secure-files',
-  path?: string
+  path?: string,
+  onProgress?: (progress: number) => void
 ): Promise<string | null> => {
   try {
+    onProgress?.(10); // Starting encryption
+    
     const encryptionKey = getCurrentUserEncryptionKey();
     if (!encryptionKey) {
       toast({
@@ -22,6 +25,7 @@ export const uploadEncryptedFile = async (
 
     // Encrypt the file
     const encryptedBlob = await encryptFile(file, encryptionKey);
+    onProgress?.(40); // Encryption complete
     
     // Create a file path if not provided
     const filePath = path || `${Date.now()}_${file.name}`;
@@ -34,6 +38,8 @@ export const uploadEncryptedFile = async (
         upsert: false,
         contentType: 'application/encrypted',
       });
+    
+    onProgress?.(80); // Upload complete
     
     if (error) {
       console.error("File upload error:", error);
@@ -63,6 +69,8 @@ export const uploadEncryptedFile = async (
     } catch (metadataError) {
       console.error("Metadata insertion error:", metadataError);
     }
+    
+    onProgress?.(100); // Process complete
     
     toast({
       title: "Upload successful",

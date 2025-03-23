@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { logoutUser } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -23,23 +26,54 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Check if the user is authenticated
-    const checkAuth = () => {
-      const token = localStorage.getItem('auth_token');
-      setIsAuthenticated(!!token);
+    // Set up authentication listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session && !!localStorage.getItem('encryption_key'));
       setIsLoading(false);
+    });
+    
+    // Check initial authentication status
+    const checkAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        setIsAuthenticated(!!data.session && !!localStorage.getItem('encryption_key'));
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     
-    // Simulate a slight delay to show loading state
-    const timer = setTimeout(checkAuth, 500);
-    return () => clearTimeout(timer);
+    checkAuth();
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('encryption_key');
-    setIsAuthenticated(false);
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      setIsLoading(true);
+      
+      await logoutUser();
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      
+      // Navigate to login page
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast({
+        title: "Logout failed",
+        description: "An error occurred during logout. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Don't render sidebar on auth pages

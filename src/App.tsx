@@ -93,17 +93,20 @@ const AuthHandler = () => {
 const App = () => {
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [authCheckCount, setAuthCheckCount] = useState(0); // Add counter to prevent infinite loops
-
+  
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
+    let isMounted = true;
     
     // Set up auth state listener first
     const setupAuthListener = async () => {
       try {
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           console.log("Auth state changed:", event, session ? "User logged in" : "No session");
+          
+          if (!isMounted) return;
           
           try {
             // For OAuth logins, generate and store encryption key when user first signs in
@@ -119,30 +122,18 @@ const App = () => {
               localStorage.setItem('encryption_key', encryptionKey);
             }
             
-            // Check authentication with a timeout to prevent hanging
-            const authCheckPromise = isAuthenticated();
-            const timeoutPromise = new Promise<boolean>((_, reject) => {
-              setTimeout(() => reject(new Error("Authentication check timed out")), 5000);
-            });
+            // Simple check if user is logged in based on session and encryption key
+            const authenticated = !!session && !!localStorage.getItem('encryption_key');
             
-            const authenticated = await Promise.race([authCheckPromise, timeoutPromise])
-              .catch(error => {
-                console.error("Auth check failed:", error);
-                return false;
-              });
-              
-            console.log("isAuthenticated returned:", authenticated);
+            console.log("User authenticated:", authenticated);
             setIsLoggedIn(authenticated);
+            setIsCheckingAuth(false);
             setIsReady(true);
             setAuthError(null);
-            
-            // Force navigation to dashboard on login events
-            if (authenticated && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
-              window.location.href = '/dashboard';
-            }
           } catch (error) {
             console.error("Error in auth state change handler:", error);
             setIsReady(true);
+            setIsCheckingAuth(false);
             setIsLoggedIn(false);
             setAuthError("Authentication error: " + (error instanceof Error ? error.message : String(error)));
           }
@@ -151,9 +142,12 @@ const App = () => {
         subscription = data.subscription;
       } catch (error) {
         console.error("Error setting up auth listener:", error);
-        setIsReady(true);
-        setIsLoggedIn(false);
-        setAuthError("Failed to initialize authentication system");
+        if (isMounted) {
+          setIsReady(true);
+          setIsCheckingAuth(false);
+          setIsLoggedIn(false);
+          setAuthError("Failed to initialize authentication system");
+        }
       }
     };
     
@@ -174,30 +168,15 @@ const App = () => {
             return { data: { session: null }, error: new Error("Session check timed out") };
           }) as any;
         
+        if (!isMounted) return;
+        
         if (error) {
           console.error("Session check error:", error);
           setAuthError(error.message);
           setIsLoggedIn(false);
         } else {
-          // Perform auth check with timeout
-          let authenticated = false;
-          if (session) {
-            try {
-              const authCheckPromise = isAuthenticated();
-              const authTimeoutPromise = new Promise<boolean>((_, reject) => {
-                setTimeout(() => reject(new Error("Authentication check timed out")), 5000);
-              });
-              
-              authenticated = await Promise.race([authCheckPromise, authTimeoutPromise])
-                .catch(error => {
-                  console.error("Auth check timed out:", error);
-                  return false;
-                });
-            } catch (error) {
-              console.error("Auth check error:", error);
-              authenticated = false;
-            }
-          }
+          // Simple check if user is logged in based on session and encryption key
+          const authenticated = !!session && !!localStorage.getItem('encryption_key');
           
           console.log("Initial auth check:", authenticated);
           setIsLoggedIn(authenticated);
@@ -205,41 +184,43 @@ const App = () => {
         }
       } catch (error) {
         console.error("Auth check error:", error);
-        setAuthError("Failed to check authentication status");
-        setIsLoggedIn(false);
+        if (isMounted) {
+          setAuthError("Failed to check authentication status");
+          setIsLoggedIn(false);
+        }
       } finally {
-        setIsReady(true);
-        // Increment counter to track auth check attempts
-        setAuthCheckCount(prev => prev + 1);
+        if (isMounted) {
+          setIsReady(true);
+          setIsCheckingAuth(false);
+        }
       }
     };
     
     checkAuth();
     
+    // If auth is hanging for too long, force ready state
+    const forceReadyTimeout = setTimeout(() => {
+      if (isMounted && isCheckingAuth) {
+        console.log("Forcing ready state after timeout");
+        setIsReady(true);
+        setIsCheckingAuth(false);
+        setAuthError("Authentication check timed out. Please try logging in again.");
+      }
+    }, 6000);
+    
     // Cleanup subscription on unmount
     return () => {
+      isMounted = false;
       if (subscription) {
         subscription.unsubscribe();
       }
+      clearTimeout(forceReadyTimeout);
     };
   }, []);
 
-  // If auth is hanging for too long, force ready state
-  useEffect(() => {
-    const forceReadyTimeout = setTimeout(() => {
-      if (!isReady) {
-        console.log("Forcing ready state after timeout");
-        setIsReady(true);
-        setAuthError("Authentication check timed out. Please try logging in again.");
-      }
-    }, 8000);
-    
-    return () => clearTimeout(forceReadyTimeout);
-  }, [isReady]);
-
   // Protected route component
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    if (!isReady) {
+    if (!isReady || isCheckingAuth) {
       return (
         <div className="flex items-center justify-center h-screen">
           <div className="animate-pulse flex flex-col items-center">
@@ -267,7 +248,7 @@ const App = () => {
       );
     }
     
-    if (!isLoggedIn) return <Navigate to="/login" />;
+    if (!isLoggedIn) return <Navigate to="/login" replace />;
     
     return <>{children}</>;
   };

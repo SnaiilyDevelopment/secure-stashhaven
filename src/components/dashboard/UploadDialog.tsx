@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -16,6 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { uploadEncryptedFile } from '@/lib/storage';
+import { ensureStorageBucket } from '@/lib/storage/storageUtils';
 
 interface UploadDialogProps {
   open: boolean;
@@ -32,6 +33,16 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const BUCKET_NAME = 'secure-files';
+  
+  // Ensure the storage bucket exists when dialog opens
+  useEffect(() => {
+    if (open) {
+      ensureStorageBucket(BUCKET_NAME).catch(err => {
+        console.error("Failed to ensure bucket exists:", err);
+      });
+    }
+  }, [open]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -51,8 +62,24 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     setError(null);
     
     try {
-      // Use uploadEncryptedFile instead of uploadFile
-      const filePath = await uploadEncryptedFile(selectedFile, 'secure-files', undefined);
+      // Simulate progress during encryption and upload
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          const newProgress = prev + (prev < 90 ? 5 : 0);
+          return newProgress > 90 ? 90 : newProgress;
+        });
+      }, 500);
+      
+      // Use uploadEncryptedFile to handle the upload
+      const filePath = await uploadEncryptedFile(selectedFile, BUCKET_NAME, undefined, (p) => {
+        if (p === 100) {
+          clearInterval(progressInterval);
+        }
+        setProgress(p);
+      });
+      
+      clearInterval(progressInterval);
+      setProgress(100);
       
       if (!filePath) {
         throw new Error("Upload failed");
@@ -62,8 +89,10 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       setSelectedFile(null);
       
       // Close the dialog and refresh the file list
-      onOpenChange(false);
-      onUploadComplete();
+      setTimeout(() => {
+        onOpenChange(false);
+        onUploadComplete();
+      }, 500);
       
     } catch (err) {
       console.error("File upload error:", err);
