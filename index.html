@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -7,6 +8,8 @@
     <meta name="description" content="Lovable Generated Project" />
     <meta name="author" content="Lovable" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <!-- Preconnect to Cloudflare to improve performance -->
+    <link rel="preconnect" href="https://static.cloudflareinsights.com" crossorigin />
   </head>
 
   <body>
@@ -14,5 +17,11 @@
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Error handling for global errors -->
+    <script>
+      window.addEventListener('error', function(event) {
+        console.error('Global error caught:', event.error);
+      });
+    </script>
   </body>
 </html>
