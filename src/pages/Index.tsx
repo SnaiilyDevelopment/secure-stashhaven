@@ -16,7 +16,19 @@ const Index = () => {
       try {
         setLoading(true);
         setError(null);
-        const authenticated = await isAuthenticated();
+        
+        // Add timeout to prevent hanging
+        const authCheckPromise = isAuthenticated();
+        const timeoutPromise = new Promise<boolean>((_, reject) => {
+          setTimeout(() => reject(new Error("Authentication check timed out")), 5000);
+        });
+        
+        const authenticated = await Promise.race([authCheckPromise, timeoutPromise])
+          .catch(error => {
+            console.error("Auth check timed out:", error);
+            setError("Authentication check timed out. Redirecting to login...");
+            return false;
+          });
         
         if (authenticated) {
           navigate('/dashboard');
@@ -34,13 +46,25 @@ const Index = () => {
         // After error, still navigate to login for better user experience
         setTimeout(() => {
           navigate('/login');
-        }, 3000);
+        }, 2000); // Reduced timeout to improve UX
       } finally {
         setLoading(false);
       }
     };
     
+    // Set a timeout to force navigation if check takes too long
+    const navigationTimeout = setTimeout(() => {
+      if (loading) {
+        console.log("Forcing navigation to login after timeout");
+        setLoading(false);
+        setError("Authentication check timed out");
+        navigate('/login');
+      }
+    }, 6000);
+    
     checkAuth();
+    
+    return () => clearTimeout(navigationTimeout);
   }, [navigate]);
   
   // Show a loading indicator while checking auth

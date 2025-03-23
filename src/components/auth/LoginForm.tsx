@@ -60,7 +60,23 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const success = await loginUser(email, password);
+      // Add a timeout to prevent hanging on login
+      const loginPromise = loginUser(email, password);
+      const timeoutPromise = new Promise<boolean>((_, reject) => {
+        setTimeout(() => reject(new Error("Login timed out")), 10000);
+      });
+      
+      const success = await Promise.race([loginPromise, timeoutPromise])
+        .catch(error => {
+          console.error("Login timed out:", error);
+          toast({
+            title: "Login Timed Out",
+            description: "The login process took too long. Please try again.",
+            variant: "destructive"
+          });
+          return false;
+        });
+      
       if (success) {
         // Show success toast
         toast({
@@ -69,7 +85,7 @@ const LoginForm: React.FC = () => {
         });
         
         // Explicitly navigate to dashboard on successful login
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       }
     } catch (error) {
       console.error("Login error:", error);

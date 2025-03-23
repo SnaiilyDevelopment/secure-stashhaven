@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -93,10 +94,11 @@ const App = () => {
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authCheckCount, setAuthCheckCount] = useState(0); // Add counter to prevent infinite loops
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
-
+    
     // Set up auth state listener first
     const setupAuthListener = async () => {
       try {
@@ -117,7 +119,18 @@ const App = () => {
               localStorage.setItem('encryption_key', encryptionKey);
             }
             
-            const authenticated = await isAuthenticated();
+            // Check authentication with a timeout to prevent hanging
+            const authCheckPromise = isAuthenticated();
+            const timeoutPromise = new Promise<boolean>((_, reject) => {
+              setTimeout(() => reject(new Error("Authentication check timed out")), 5000);
+            });
+            
+            const authenticated = await Promise.race([authCheckPromise, timeoutPromise])
+              .catch(error => {
+                console.error("Auth check failed:", error);
+                return false;
+              });
+              
             console.log("isAuthenticated returned:", authenticated);
             setIsLoggedIn(authenticated);
             setIsReady(true);
@@ -149,15 +162,43 @@ const App = () => {
       try {
         await setupAuthListener();
         
-        // Initial session check
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Initial session check with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Session check timed out")), 5000);
+        });
+        
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise])
+          .catch(error => {
+            console.error("Session check timed out:", error);
+            return { data: { session: null }, error: new Error("Session check timed out") };
+          }) as any;
         
         if (error) {
           console.error("Session check error:", error);
           setAuthError(error.message);
           setIsLoggedIn(false);
         } else {
-          const authenticated = session ? await isAuthenticated() : false;
+          // Perform auth check with timeout
+          let authenticated = false;
+          if (session) {
+            try {
+              const authCheckPromise = isAuthenticated();
+              const authTimeoutPromise = new Promise<boolean>((_, reject) => {
+                setTimeout(() => reject(new Error("Authentication check timed out")), 5000);
+              });
+              
+              authenticated = await Promise.race([authCheckPromise, authTimeoutPromise])
+                .catch(error => {
+                  console.error("Auth check timed out:", error);
+                  return false;
+                });
+            } catch (error) {
+              console.error("Auth check error:", error);
+              authenticated = false;
+            }
+          }
+          
           console.log("Initial auth check:", authenticated);
           setIsLoggedIn(authenticated);
           setAuthError(null);
@@ -168,6 +209,8 @@ const App = () => {
         setIsLoggedIn(false);
       } finally {
         setIsReady(true);
+        // Increment counter to track auth check attempts
+        setAuthCheckCount(prev => prev + 1);
       }
     };
     
@@ -180,6 +223,19 @@ const App = () => {
       }
     };
   }, []);
+
+  // If auth is hanging for too long, force ready state
+  useEffect(() => {
+    const forceReadyTimeout = setTimeout(() => {
+      if (!isReady) {
+        console.log("Forcing ready state after timeout");
+        setIsReady(true);
+        setAuthError("Authentication check timed out. Please try logging in again.");
+      }
+    }, 8000);
+    
+    return () => clearTimeout(forceReadyTimeout);
+  }, [isReady]);
 
   // Protected route component
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
