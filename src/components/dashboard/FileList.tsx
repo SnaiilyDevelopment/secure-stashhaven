@@ -1,15 +1,13 @@
-
 import React from 'react';
 import { FolderPlus, FilePlus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FileCard from './FileCard';
-import { FileMetadata, SharedFile } from '@/lib/types';
+import { FileItemAdapter } from '@/lib/types';
 
 interface FileListProps {
-  files?: FileMetadata[];
-  sharedFiles?: SharedFile[];
+  files: FileItemAdapter[];
   searchQuery?: string;
   activeTab?: string;
   isLoading: boolean;
@@ -23,7 +21,6 @@ interface FileListProps {
 
 const FileList: React.FC<FileListProps> = ({
   files = [],
-  sharedFiles = [],
   searchQuery = '',
   activeTab = 'all',
   isLoading,
@@ -34,34 +31,8 @@ const FileList: React.FC<FileListProps> = ({
   onDeleteComplete,
   emptyMessage = "No files found"
 }) => {
-  // Adapt file metadata to format expected by FileCard
-  const adaptedFiles = files.map(file => ({
-    id: file.id,
-    name: file.original_name,
-    size: file.size,
-    type: file.original_type,
-    encryptedType: 'application/encrypted',
-    dateAdded: file.created_at,
-    encrypted: file.encrypted
-  }));
-  
-  // Adapt shared files to format expected by FileCard
-  const adaptedSharedFiles = sharedFiles.map(file => ({
-    id: file.id,
-    name: file.original_name,
-    size: file.size,
-    type: file.original_type,
-    encryptedType: 'application/encrypted',
-    dateAdded: file.shared_at,
-    encrypted: true,
-    isShared: true,
-    owner: file.owner_email
-  }));
-  
-  const displayFiles = sharedFiles.length > 0 ? adaptedSharedFiles : adaptedFiles;
-  
   // Filter files by search query and type if needed
-  const filteredFiles = displayFiles.filter(file => {
+  const filteredFiles = files.filter(file => {
     if (!searchQuery) return true;
     return file.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -143,7 +114,6 @@ const FileList: React.FC<FileListProps> = ({
     );
   }
   
-  // Simplified version without tabs for shared files or when setActiveTab is not provided
   return (
     <>
       {isLoading && (

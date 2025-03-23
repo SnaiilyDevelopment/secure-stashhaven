@@ -54,113 +54,60 @@ export const shareFileWithUser = async (
       };
     }
     
-    // Check if file exists
-    const { data: fileCheck, error: fileError } = await supabase
-      .from('file_metadata')
-      .select('file_path')
-      .eq('file_path', filePath)
-      .maybeSingle();
+    // Use RPC function to share file
+    const { data, error } = await supabase
+      .rpc('share_file_with_user', { 
+        file_path_param: filePath,
+        recipient_email_param: recipientEmail,
+        permissions_param: permissions
+      });
       
-    if (fileError || !fileCheck) {
-      console.error("File check error:", fileError);
-      return { 
-        success: false, 
-        error: ShareFileError.INVALID_FILE,
-        message: "File not found" 
-      };
-    }
-    
-    // Get current user ID
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return { 
-        success: false, 
-        error: ShareFileError.SERVER_ERROR,
-        message: "Authentication required" 
-      };
-    }
-    
-    // Get recipient user ID
-    const { data: recipientData, error: recipientError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', recipientEmail)
-      .maybeSingle();
+    if (error) {
+      console.error("Share file error:", error);
       
-    if (recipientError || !recipientData) {
-      console.error("Recipient lookup error:", recipientError);
-      return { 
-        success: false, 
-        error: ShareFileError.USER_NOT_FOUND,
-        message: `User with email ${recipientEmail} not found` 
-      };
-    }
-    
-    // Check if already shared
-    const { data: existingShare, error: shareCheckError } = await supabase
-      .from('file_shares')
-      .select('id')
-      .eq('file_path', filePath)
-      .eq('owner_id', user.id)
-      .eq('recipient_id', recipientData.id)
-      .maybeSingle();
-      
-    if (shareCheckError) {
-      console.error("Share check error:", shareCheckError);
-      return { 
-        success: false, 
-        error: ShareFileError.SERVER_ERROR,
-        message: "Failed to check existing shares" 
-      };
-    }
-    
-    if (existingShare) {
-      // Update existing share
-      const { error: updateError } = await supabase
-        .from('file_shares')
-        .update({ permissions })
-        .eq('id', existingShare.id);
-        
-      if (updateError) {
-        console.error("Share update error:", updateError);
+      // Handle specific error cases
+      if (error.message.includes("not found")) {
         return { 
           success: false, 
-          error: ShareFileError.SERVER_ERROR,
-          message: "Failed to update share permissions" 
+          error: ShareFileError.USER_NOT_FOUND,
+          message: `User with email ${recipientEmail} not found` 
+        };
+      }
+      
+      if (error.message.includes("already shared")) {
+        return { 
+          success: false, 
+          error: ShareFileError.ALREADY_SHARED,
+          message: `File is already shared with ${recipientEmail}` 
+        };
+      }
+      
+      if (error.message.includes("file not found")) {
+        return { 
+          success: false, 
+          error: ShareFileError.INVALID_FILE,
+          message: "File not found" 
         };
       }
       
       return { 
-        success: true,
-        shareId: existingShare.id,
-        message: `Updated share permissions for ${recipientEmail}` 
+        success: false, 
+        error: ShareFileError.SERVER_ERROR,
+        message: "An error occurred while sharing the file" 
       };
     }
     
-    // Create new share
-    const { data: newShare, error: insertError } = await supabase
-      .from('file_shares')
-      .insert({
-        file_path: filePath,
-        owner_id: user.id,
-        recipient_id: recipientData.id,
-        permissions
-      })
-      .select('id')
-      .single();
-      
-    if (insertError || !newShare) {
-      console.error("Share creation error:", insertError);
+    if (!data || !data.share_id) {
       return { 
         success: false, 
         error: ShareFileError.SERVER_ERROR,
-        message: "Failed to create share" 
+        message: "Failed to share file" 
       };
     }
     
     return { 
       success: true,
-      shareId: newShare.id,
+      shareId: data.share_id,
       message: `Successfully shared with ${recipientEmail}` 
     };
     

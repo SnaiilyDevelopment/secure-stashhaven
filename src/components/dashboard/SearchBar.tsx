@@ -6,9 +6,13 @@ import { Input } from '@/components/ui/input';
 interface SearchBarProps {
   value: string;
   onChange: (query: string) => void;
+  searchQuery?: string; // Add this for backward compatibility
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ value, onChange }) => {
+const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, searchQuery }) => {
+  // Use searchQuery as fallback if provided
+  const inputValue = searchQuery !== undefined ? searchQuery : value;
+  
   return (
     <div className="relative flex-1 md:w-64">
       <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -17,7 +21,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onChange }) => {
       <Input
         placeholder="Search files..."
         className="pl-10 border-green-200 focus:ring-green-500"
-        value={value}
+        value={inputValue}
         onChange={(e) => onChange(e.target.value)}
       />
     </div>

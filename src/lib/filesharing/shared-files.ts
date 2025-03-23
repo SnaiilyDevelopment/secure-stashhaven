@@ -13,59 +13,34 @@ export const getFilesSharedWithMe = async (): Promise<SharedFile[]> => {
       return [];
     }
     
-    // Get all files shared with the current user
-    // Use explicit joins instead of relying on relationship detection
+    // Get shared files using RPC function
     const { data, error } = await supabase
-      .from('file_shares')
-      .select(`
-        id,
-        file_path,
-        permissions,
-        created_at,
-        owner_id
-      `)
-      .eq('recipient_id', user.id);
+      .rpc('get_files_shared_with_me', { recipient_id_param: user.id });
       
     if (error || !data) {
       console.error("Error fetching shared files:", error);
       return [];
     }
     
-    // Process results and fetch additional data
-    const sharedFilesWithDetails = await Promise.all(
-      data.map(async (share) => {
-        // Get file metadata
-        const { data: fileMetadata } = await supabase
-          .from('file_metadata')
-          .select('original_name, original_type, size')
-          .eq('file_path', share.file_path)
-          .maybeSingle();
-        
-        // Get owner profile
-        const { data: ownerProfile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', share.owner_id)
-          .maybeSingle();
-        
-        const permission = share.permissions;
-        // Ensure the permission is one of the valid types
-        const validPermission = isValidPermission(permission) ? permission : 'view';
-        
-        return {
-          id: share.id,
-          file_path: share.file_path || '',
-          original_name: fileMetadata?.original_name || 'Unknown file',
-          original_type: fileMetadata?.original_type || '',
-          size: fileMetadata?.size || 0,
-          permissions: validPermission,
-          shared_at: share.created_at || '',
-          owner_email: ownerProfile?.email || 'Unknown owner'
-        };
-      })
-    );
+    // Process results
+    const sharedFiles: SharedFile[] = data.map((item: any) => {
+      const permission = item.permissions;
+      // Ensure the permission is one of the valid types
+      const validPermission = isValidPermission(permission) ? permission : 'view';
+      
+      return {
+        id: item.share_id,
+        file_path: item.file_path || '',
+        original_name: item.original_name || 'Unknown file',
+        original_type: item.original_type || '',
+        size: item.size || 0,
+        permissions: validPermission,
+        shared_at: item.created_at || '',
+        owner_email: item.owner_email || 'Unknown owner'
+      };
+    });
     
-    return sharedFilesWithDetails;
+    return sharedFiles;
     
   } catch (error) {
     console.error("Error fetching shared files:", error);

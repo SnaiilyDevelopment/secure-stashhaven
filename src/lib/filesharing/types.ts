@@ -34,6 +34,16 @@ export interface Profile {
   created_at?: string;
 }
 
+// Add necessary database tables
+export interface FileShareTable {
+  id: string;
+  file_path: string;
+  owner_id: string;
+  recipient_id: string;
+  permissions: 'view' | 'edit' | 'admin';
+  created_at: string;
+}
+
 /**
  * Utility function to validate permissions string
  */

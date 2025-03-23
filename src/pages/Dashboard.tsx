@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilePlus } from 'lucide-react';
@@ -9,6 +8,7 @@ import { isAuthenticated, getCurrentUserEncryptionKey } from '@/lib/auth';
 import { encryptFile, decryptFile } from '@/lib/encryption';
 import SearchBar from '@/components/dashboard/SearchBar';
 import FileList from '@/components/dashboard/FileList';
+import { adaptFileMetadataToFileItem } from '@/lib/types';
 
 interface FileItem {
   id: string;
@@ -33,7 +33,6 @@ const Dashboard = () => {
       return;
     }
     
-    // Load files from localStorage
     const loadFiles = () => {
       try {
         const savedFiles = localStorage.getItem('encrypted_files');
@@ -48,13 +47,11 @@ const Dashboard = () => {
     loadFiles();
   }, [navigate]);
   
-  // Save files to localStorage
   const saveFiles = (updatedFiles: FileItem[]) => {
     localStorage.setItem('encrypted_files', JSON.stringify(updatedFiles));
     setFiles(updatedFiles);
   };
   
-  // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFiles = event.target.files;
     if (!uploadedFiles || uploadedFiles.length === 0) return;
@@ -78,10 +75,8 @@ const Dashboard = () => {
       for (let i = 0; i < uploadedFiles.length; i++) {
         const file = uploadedFiles[i];
         
-        // Encrypt the file
         const encryptedBlob = await encryptFile(file, encryptionKey);
         
-        // Store the encrypted file
         const fileReader = new FileReader();
         
         const readFilePromise = new Promise<string>((resolve, reject) => {
@@ -92,7 +87,6 @@ const Dashboard = () => {
         fileReader.readAsDataURL(encryptedBlob);
         const encryptedFileData = await readFilePromise;
         
-        // Save the file metadata and encrypted content
         const newFile: FileItem = {
           id: crypto.randomUUID(),
           name: file.name,
@@ -103,13 +97,11 @@ const Dashboard = () => {
           encrypted: true
         };
         
-        // Store the encrypted file data
         localStorage.setItem(`file_${newFile.id}`, encryptedFileData);
         
         newFiles.push(newFile);
       }
       
-      // Update files list
       saveFiles(newFiles);
       
       toast({
@@ -125,12 +117,10 @@ const Dashboard = () => {
       });
     } finally {
       setIsUploading(false);
-      // Reset the input
       event.target.value = '';
     }
   };
   
-  // Download a file
   const downloadFile = async (fileId: string) => {
     try {
       const fileToDownload = files.find(file => file.id === fileId);
@@ -147,7 +137,6 @@ const Dashboard = () => {
         return;
       }
       
-      // Get the encrypted file data
       const encryptedFileData = localStorage.getItem(`file_${fileId}`);
       if (!encryptedFileData) {
         toast({
@@ -158,14 +147,11 @@ const Dashboard = () => {
         return;
       }
       
-      // Convert data URL to Blob
       const response = await fetch(encryptedFileData);
       const encryptedBlob = await response.blob();
       
-      // Decrypt the file
       const decryptedBlob = await decryptFile(encryptedBlob, encryptionKey, fileToDownload.type);
       
-      // Create download link
       const url = URL.createObjectURL(decryptedBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -189,14 +175,11 @@ const Dashboard = () => {
     }
   };
   
-  // Delete a file
   const deleteFile = (fileId: string) => {
     try {
-      // Remove the file from the list
       const updatedFiles = files.filter(file => file.id !== fileId);
       saveFiles(updatedFiles);
       
-      // Remove the file data
       localStorage.removeItem(`file_${fileId}`);
       
       toast({
@@ -225,7 +208,10 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+            <SearchBar 
+              value={searchQuery} 
+              onChange={setSearchQuery} 
+            />
             
             <label htmlFor="file-upload">
               <Button className="gap-2 bg-green-600 hover:bg-green-700">
@@ -245,10 +231,18 @@ const Dashboard = () => {
         </header>
         
         <FileList 
-          files={files}
+          files={files.map(file => ({
+            id: file.id,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            encryptedType: file.encryptedType,
+            dateAdded: file.dateAdded,
+            encrypted: file.encrypted
+          }))}
           searchQuery={searchQuery}
           activeTab={activeTab}
-          isUploading={isUploading}
+          isLoading={isUploading}
           setActiveTab={setActiveTab}
           handleFileUpload={handleFileUpload}
           downloadFile={downloadFile}

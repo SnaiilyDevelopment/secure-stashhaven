@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
 import SearchBar from './SearchBar';
-import { SharedFile, FileMetadata } from '@/lib/types';
+import { SharedFile, FileMetadata, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/types';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -33,6 +33,12 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     file.original_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Convert FileMetadata to FileItem using our adapter
+  const adaptedFiles = filteredFiles.map(adaptFileMetadataToFileItem);
+  
+  // Convert SharedFile to FileItem using our adapter
+  const adaptedSharedFiles = filteredSharedFiles.map(adaptSharedFileToFileItem);
+
   return (
     <div className="space-y-4">
       <SearchBar value={searchTerm} onChange={onSearchChange} />
@@ -50,7 +56,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
         
         <TabsContent value="my-files" className="mt-6">
           <FileList 
-            files={filteredFiles}
+            files={adaptedFiles}
             isLoading={isLoading}
             onDeleteComplete={onRefresh}
             emptyMessage="No files found. Upload your first encrypted file."
@@ -59,7 +65,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
         
         <TabsContent value="shared-with-me" className="mt-6">
           <FileList 
-            sharedFiles={filteredSharedFiles}
+            files={adaptedSharedFiles}
             isLoading={isLoading}
             onDeleteComplete={onRefresh}
             emptyMessage="No files have been shared with you yet."
