@@ -4,11 +4,11 @@ import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface SearchBarProps {
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  value: string;
+  onChange: (query: string) => void;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, setSearchQuery }) => {
+const SearchBar: React.FC<SearchBarProps> = ({ value, onChange }) => {
   return (
     <div className="relative flex-1 md:w-64">
       <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -17,8 +17,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, setSearchQuery }) =>
       <Input
         placeholder="Search files..."
         className="pl-10 border-green-200 focus:ring-green-500"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
       />
     </div>
   );

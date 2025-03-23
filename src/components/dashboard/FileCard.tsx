@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Download, MoreHorizontal, Trash2, Lock, File, ImageIcon, FileText, FileArchive } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, Lock, File, ImageIcon, FileText, FileArchive, Share } from 'lucide-react';
 import { 
   Card, 
   CardContent, 
@@ -19,18 +19,21 @@ interface FileItem {
   name: string;
   size: number;
   type: string;
-  encryptedType: string;
+  encryptedType?: string;
   dateAdded: string;
   encrypted: boolean;
+  isShared?: boolean;
+  owner?: string;
 }
 
 interface FileCardProps {
   file: FileItem;
-  onDownload: (fileId: string) => void;
-  onDelete: (fileId: string) => void;
+  onDownload?: (fileId: string) => void;
+  onDelete?: (fileId: string) => void;
+  onShare?: (fileId: string) => void;
 }
 
-const FileCard: React.FC<FileCardProps> = ({ file, onDownload, onDelete }) => {
+const FileCard: React.FC<FileCardProps> = ({ file, onDownload, onDelete, onShare }) => {
   // Get appropriate icon for file type
   const getFileTypeIcon = (fileType: string) => {
     if (fileType.includes('image/')) return <ImageIcon className="h-8 w-8 text-green-500" />;
@@ -64,6 +67,12 @@ const FileCard: React.FC<FileCardProps> = ({ file, onDownload, onDelete }) => {
               <span>{formatFileSize(file.size)}</span>
               <span>•</span>
               <span>{new Date(file.dateAdded).toLocaleDateString()}</span>
+              {file.isShared && file.owner && (
+                <>
+                  <span>•</span>
+                  <span>From: {file.owner}</span>
+                </>
+              )}
             </div>
           </div>
           <DropdownMenu>
@@ -73,17 +82,29 @@ const FileCard: React.FC<FileCardProps> = ({ file, onDownload, onDelete }) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-white/90 backdrop-blur-sm border-green-100">
-              <DropdownMenuItem onClick={() => onDownload(file.id)} className="text-green-700 focus:text-green-700 focus:bg-green-50">
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onDelete(file.id)}
-                className="text-red-500 focus:text-red-500 focus:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
+              {onDownload && (
+                <DropdownMenuItem onClick={() => onDownload(file.id)} className="text-green-700 focus:text-green-700 focus:bg-green-50">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </DropdownMenuItem>
+              )}
+              
+              {onShare && !file.isShared && (
+                <DropdownMenuItem onClick={() => onShare(file.id)} className="text-green-700 focus:text-green-700 focus:bg-green-50">
+                  <Share className="h-4 w-4 mr-2" />
+                  Share
+                </DropdownMenuItem>
+              )}
+              
+              {onDelete && (
+                <DropdownMenuItem
+                  onClick={() => onDelete(file.id)}
+                  className="text-red-500 focus:text-red-500 focus:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

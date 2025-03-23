@@ -45,59 +45,6 @@ export type Database = {
         }
         Relationships: []
       }
-      file_shares: {
-        Row: {
-          created_at: string | null
-          file_path: string | null
-          id: string
-          owner_id: string | null
-          permissions: string
-          recipient_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          file_path?: string | null
-          id?: string
-          owner_id?: string | null
-          permissions: string
-          recipient_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          file_path?: string | null
-          id?: string
-          owner_id?: string | null
-          permissions?: string
-          recipient_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "file_shares_file_path_fkey"
-            columns: ["file_path"]
-            isOneToOne: false
-            referencedRelation: "file_metadata"
-            referencedColumns: ["file_path"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          created_at: string | null
-          email: string
-          id: string
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          id: string
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never

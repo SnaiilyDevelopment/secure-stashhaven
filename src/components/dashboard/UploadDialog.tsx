@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { uploadFile } from '@/lib/storage';
+import { uploadEncryptedFile } from '@/lib/storage';
 
 interface UploadDialogProps {
   open: boolean;
@@ -51,11 +51,12 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     setError(null);
     
     try {
-      // Use the progress callback to update the progress state
-      await uploadFile(selectedFile, (progressEvent) => {
-        const newProgress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-        setProgress(newProgress);
-      });
+      // Use uploadEncryptedFile instead of uploadFile
+      const filePath = await uploadEncryptedFile(selectedFile, 'secure-files', undefined);
+      
+      if (!filePath) {
+        throw new Error("Upload failed");
+      }
       
       // Reset the form after successful upload
       setSelectedFile(null);
