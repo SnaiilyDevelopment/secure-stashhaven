@@ -1,4 +1,8 @@
 
+// Import types from other modules
+import { FileMetadata } from './storage/fileManagement';
+import { SharedFile, FileRecipient } from './filesharing/types';
+
 // Re-export types from other modules for consistent imports
 export type { FileMetadata } from './storage/fileManagement';
 export type { SharedFile, FileRecipient } from './filesharing/types';
