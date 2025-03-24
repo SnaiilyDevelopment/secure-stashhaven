@@ -12,7 +12,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import { isAuthenticated } from "./lib/auth";
+import { isAuthenticated, handleAuthError, AuthStatus } from "./lib/auth";
 import { supabase } from "./integrations/supabase/client";
 import { toast } from "./components/ui/use-toast";
 
@@ -94,7 +94,7 @@ const App = () => {
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
@@ -129,13 +129,20 @@ const App = () => {
             setIsLoggedIn(authenticated);
             setIsCheckingAuth(false);
             setIsReady(true);
-            setAuthError(null);
+            setAuthStatus(null);
           } catch (error) {
             console.error("Error in auth state change handler:", error);
             setIsReady(true);
             setIsCheckingAuth(false);
             setIsLoggedIn(false);
-            setAuthError("Authentication error: " + (error instanceof Error ? error.message : String(error)));
+            setAuthStatus({
+              authenticated: false,
+              error: error instanceof Error ? 
+                  (error.message.includes('network') ? 'connection_error' : 'unknown_error') as any : 
+                  'unknown_error' as any,
+              errorMessage: error instanceof Error ? error.message : String(error),
+              retryable: true
+            });
           }
         });
         
@@ -146,7 +153,12 @@ const App = () => {
           setIsReady(true);
           setIsCheckingAuth(false);
           setIsLoggedIn(false);
-          setAuthError("Failed to initialize authentication system");
+          setAuthStatus({
+            authenticated: false,
+            error: 'unknown_error' as any,
+            errorMessage: "Failed to initialize authentication system",
+            retryable: true
+          });
         }
       }
     };
@@ -172,7 +184,12 @@ const App = () => {
         
         if (error) {
           console.error("Session check error:", error);
-          setAuthError(error.message);
+          setAuthStatus({
+            authenticated: false,
+            error: 'session_error' as any,
+            errorMessage: error.message,
+            retryable: true
+          });
           setIsLoggedIn(false);
         } else {
           // Simple check if user is logged in based on session and encryption key
@@ -180,12 +197,17 @@ const App = () => {
           
           console.log("Initial auth check:", authenticated);
           setIsLoggedIn(authenticated);
-          setAuthError(null);
+          setAuthStatus(null);
         }
       } catch (error) {
         console.error("Auth check error:", error);
         if (isMounted) {
-          setAuthError("Failed to check authentication status");
+          setAuthStatus({
+            authenticated: false,
+            error: 'unknown_error' as any,
+            errorMessage: "Failed to check authentication status",
+            retryable: true
+          });
           setIsLoggedIn(false);
         }
       } finally {
@@ -204,7 +226,12 @@ const App = () => {
         console.log("Forcing ready state after timeout");
         setIsReady(true);
         setIsCheckingAuth(false);
-        setAuthError("Authentication check timed out. Please try logging in again.");
+        setAuthStatus({
+          authenticated: false,
+          error: 'timeout_error' as any,
+          errorMessage: "Authentication check timed out. Please try logging in again.",
+          retryable: true
+        });
       }
     }, 6000);
     
@@ -231,12 +258,12 @@ const App = () => {
       );
     }
     
-    if (authError) {
+    if (authStatus?.error) {
       return (
         <div className="flex items-center justify-center h-screen">
           <div className="bg-destructive/10 p-6 rounded-lg max-w-md">
             <h2 className="text-xl font-semibold text-destructive mb-2">Authentication Error</h2>
-            <p className="mb-4">{authError}</p>
+            <p className="mb-4">{authStatus.errorMessage || "An error occurred during authentication"}</p>
             <button 
               className="bg-primary text-primary-foreground px-4 py-2 rounded"
               onClick={() => window.location.href = '/login'}

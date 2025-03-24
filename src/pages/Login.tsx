@@ -1,21 +1,20 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LockKeyhole } from 'lucide-react';
+import { LockKeyhole, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { isAuthenticated, handleAuthError, AuthError } from '@/lib/auth';
+import { isAuthenticated, handleAuthError, AuthError, AuthStatus } from '@/lib/auth';
 import ThreeDBackground from '@/components/3DBackground';
 import LoginForm from '@/components/auth/LoginForm';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [authError, setAuthError] = useState<AuthError | undefined>(undefined);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   const checkAuth = async () => {
@@ -37,16 +36,16 @@ const Login = () => {
         return;
       }
       
-      // Fallback to original authentication check with enhanced error handling
-      const { authenticated, error } = await isAuthenticated();
+      // Fallback to enhanced authentication check with better error handling
+      const status = await isAuthenticated();
       
-      if (error) {
-        console.error("Authentication error:", error);
-        setAuthError(error);
-        handleAuthError(error);
+      if (status.error) {
+        console.error("Authentication error:", status.error, status.errorMessage);
+        setAuthStatus(status);
+        handleAuthError(status);
       }
       
-      if (authenticated) {
+      if (status.authenticated) {
         console.log("User authenticated via isAuthenticated(), redirecting to dashboard");
         navigate('/dashboard', { replace: true });
       } else {
@@ -54,12 +53,14 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Authentication check failed:", error);
-      setAuthError(AuthError.UNKNOWN);
-      toast({
-        title: "Authentication Error",
-        description: "There was a problem checking your authentication status.",
-        variant: "destructive"
-      });
+      const errorStatus: AuthStatus = {
+        authenticated: false, 
+        error: AuthError.UNKNOWN,
+        errorMessage: error instanceof Error ? error.message : "Failed to check authentication status",
+        retryable: true
+      };
+      setAuthStatus(errorStatus);
+      handleAuthError(errorStatus);
     } finally {
       setCheckingAuth(false);
     }
@@ -71,6 +72,12 @@ const Login = () => {
       if (checkingAuth) {
         console.log("Auth check timed out, allowing login page to display");
         setCheckingAuth(false);
+        setAuthStatus({
+          authenticated: false,
+          error: AuthError.TIMEOUT,
+          errorMessage: "Authentication check took too long. You can still try to log in.",
+          retryable: true
+        });
       }
     }, 2000);
     
@@ -82,7 +89,11 @@ const Login = () => {
   // Function to retry authentication
   const handleRetryAuth = () => {
     setRetryCount(prev => prev + 1);
-    setAuthError(undefined);
+    setAuthStatus(null);
+    toast({
+      title: "Retrying Authentication",
+      description: "Checking your authentication status again...",
+    });
   };
 
   // Show a simple loading state while checking auth
@@ -114,10 +125,10 @@ const Login = () => {
         </div>
         
         {/* Show error alert with retry button if there's an auth error */}
-        {authError && (
+        {authStatus?.error && authStatus.retryable && (
           <Alert variant="destructive" className="mb-4 backdrop-blur-sm bg-red-50/90 border-red-200">
             <AlertDescription className="flex items-center justify-between">
-              <span>There was a problem with authentication. Please try again.</span>
+              <span>{authStatus.errorMessage || "There was a problem with authentication. Please try again."}</span>
               <Button 
                 variant="outline" 
                 size="sm" 
