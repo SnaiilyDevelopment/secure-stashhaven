@@ -7,6 +7,7 @@ import { isAuthenticated } from '@/lib/auth';
 import ThreeDBackground from '@/components/3DBackground';
 import LoginForm from '@/components/auth/LoginForm';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -16,10 +17,29 @@ const Login = () => {
     const checkAuth = async () => {
       try {
         setCheckingAuth(true);
+        console.log("Checking authentication status...");
+        
+        // First check if we have a session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error("Session check error:", sessionError);
+          throw sessionError;
+        }
+        
+        // If we have a session and encryption key, consider authenticated
+        if (sessionData.session && localStorage.getItem('encryption_key')) {
+          console.log("Session and encryption key found, redirecting to dashboard");
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+        
+        // Fallback to original authentication check
         const authenticated = await isAuthenticated();
         if (authenticated) {
-          console.log("User already authenticated, redirecting to dashboard");
+          console.log("User authenticated via isAuthenticated(), redirecting to dashboard");
           navigate('/dashboard', { replace: true });
+        } else {
+          console.log("User not authenticated, showing login page");
         }
       } catch (error) {
         console.error("Authentication check failed:", error);
@@ -33,13 +53,13 @@ const Login = () => {
       }
     };
     
-    // Set a timeout to ensure the check doesn't hang
+    // Set a short timeout to ensure the check doesn't hang
     const authTimeout = setTimeout(() => {
       if (checkingAuth) {
         console.log("Auth check timed out, allowing login page to display");
         setCheckingAuth(false);
       }
-    }, 3000);
+    }, 2000);
     
     checkAuth();
     

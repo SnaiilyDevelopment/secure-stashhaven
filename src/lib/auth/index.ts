@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 // Check if user is authenticated
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
+    console.log("Checking authentication status in isAuthenticated()");
+    
     // Check for session
     const { data: { session }, error } = await supabase.auth.getSession();
     
@@ -26,17 +28,31 @@ export const isAuthenticated = async (): Promise<boolean> => {
       // If we don't have an encryption key yet, generate one
       if (!localStorage.getItem('encryption_key')) {
         console.log("OAuth user authenticated but no encryption key, generating one");
-        const encryptionKey = await generateEncryptionKey();
-        localStorage.setItem('encryption_key', encryptionKey);
+        try {
+          const encryptionKey = await generateEncryptionKey();
+          localStorage.setItem('encryption_key', encryptionKey);
+        } catch (error) {
+          console.error("Error generating encryption key:", error);
+          return false;
+        }
       }
       
+      console.log("OAuth user authenticated with encryption key");
       return true;
     }
     
     // For email/password users, check both session and encryption key
     const hasEncryptionKey = !!localStorage.getItem('encryption_key');
     console.log("Email user authenticated, encryption key present:", hasEncryptionKey);
-    return hasEncryptionKey;
+    
+    if (!hasEncryptionKey) {
+      console.log("No encryption key found, user not fully authenticated");
+      // Clear the session if we don't have an encryption key
+      await supabase.auth.signOut();
+      return false;
+    }
+    
+    return true;
   } catch (error) {
     console.error("Authentication check error:", error);
     return false;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, KeyRound, ArrowRight, Loader2 } from 'lucide-react';
@@ -92,18 +93,20 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
     
     try {
+      console.log("Attempting login for:", email);
+      
       // Add a timeout to prevent hanging on login
       const loginPromise = loginUser(email, password);
       const timeoutPromise = new Promise<boolean>((_, reject) => {
-        setTimeout(() => reject(new Error("Login timed out")), 10000);
+        setTimeout(() => reject(new Error("Login timed out")), 15000);
       });
       
       const success = await Promise.race([loginPromise, timeoutPromise])
         .catch(error => {
-          console.error("Login timed out:", error);
+          console.error("Login error:", error);
           toast({
-            title: "Login Timed Out",
-            description: "The login process took too long. Please try again.",
+            title: "Login Failed",
+            description: "The login process failed. Please try again.",
             variant: "destructive"
           });
           return false;
@@ -116,11 +119,13 @@ const LoginForm: React.FC = () => {
           description: "Welcome back to your secure vault.",
         });
         
-        // Force redirect to dashboard
         console.log("Login successful, redirecting to dashboard...");
+        
+        // Force redirect with a small delay to ensure the auth state is updated
         setTimeout(() => {
+          console.log("Executing redirect to dashboard");
           navigate('/dashboard', { replace: true });
-        }, 500); // Short delay to ensure the toast is shown
+        }, 800);
       }
     } catch (error) {
       console.error("Login error:", error);

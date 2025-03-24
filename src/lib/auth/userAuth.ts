@@ -2,6 +2,94 @@ import { toast } from "@/components/ui/use-toast";
 import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
 
+// Login a user with email/password
+export const loginUser = async (email: string, password: string): Promise<boolean> => {
+  try {
+    console.log("Attempting login for user:", email);
+    
+    // Sign in with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    
+    if (error || !data.user) {
+      console.error("Login error:", error);
+      toast({
+        title: "Login failed",
+        description: error?.message || "Invalid email or password.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    const salt = data.user.user_metadata.salt;
+    const encryptedMasterKey = data.user.user_metadata.encryptedMasterKey;
+    
+    if (!salt || !encryptedMasterKey) {
+      console.error("Missing user metadata:", { salt, encryptedMasterKey });
+      toast({
+        title: "Login failed",
+        description: "User data is corrupted. Please contact support.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // Derive key from password with user's salt
+    const { key: derivedKey } = await deriveKeyFromPassword(password, salt);
+    
+    try {
+      // Attempt to decrypt the master key (this will fail if password is wrong)
+      const masterKeyBase64 = await decryptText(encryptedMasterKey, derivedKey);
+      
+      // Store encryption key
+      localStorage.setItem('encryption_key', masterKeyBase64);
+      
+      console.log("Login successful, encryption key stored");
+      return true;
+    } catch (error) {
+      // Decryption failed - wrong password
+      console.error("Decryption failed:", error);
+      
+      // Force sign out since decryption failed
+      await supabase.auth.signOut();
+      
+      toast({
+        title: "Login failed",
+        description: "Invalid email or password.",
+        variant: "destructive"
+      });
+      return false;
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    toast({
+      title: "Login failed",
+      description: "An unexpected error occurred.",
+      variant: "destructive"
+    });
+    return false;
+  }
+};
+
+// Log out the current user
+export const logoutUser = async (): Promise<void> => {
+  try {
+    console.log("Logging out user");
+    localStorage.removeItem('encryption_key');
+    await supabase.auth.signOut();
+    console.log("User logged out successfully");
+  } catch (error) {
+    console.error("Logout error:", error);
+    toast({
+      title: "Logout error",
+      description: "An error occurred during logout.",
+      variant: "destructive"
+    });
+  }
+};
+
 // Register a new user with email/password
 export const registerUser = async (email: string, password: string): Promise<boolean> => {
   try {
@@ -93,73 +181,6 @@ export const registerUser = async (email: string, password: string): Promise<boo
   }
 };
 
-// Login a user with email/password
-export const loginUser = async (email: string, password: string): Promise<boolean> => {
-  try {
-    console.log("Attempting login for user:", email);
-    
-    // Sign in with Supabase
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    
-    if (error || !data.user) {
-      console.error("Login error:", error);
-      toast({
-        title: "Login failed",
-        description: error?.message || "Invalid email or password.",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    const salt = data.user.user_metadata.salt;
-    const encryptedMasterKey = data.user.user_metadata.encryptedMasterKey;
-    
-    if (!salt || !encryptedMasterKey) {
-      console.error("Missing user metadata:", { salt, encryptedMasterKey });
-      toast({
-        title: "Login failed",
-        description: "User data is corrupted. Please contact support.",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    // Derive key from password with user's salt
-    const { key: derivedKey } = await deriveKeyFromPassword(password, salt);
-    
-    try {
-      // Attempt to decrypt the master key (this will fail if password is wrong)
-      const masterKeyBase64 = await decryptText(encryptedMasterKey, derivedKey);
-      
-      // Store encryption key
-      localStorage.setItem('encryption_key', masterKeyBase64);
-      
-      console.log("Login successful, encryption key stored");
-      return true;
-    } catch (error) {
-      // Decryption failed - wrong password
-      console.error("Decryption failed:", error);
-      toast({
-        title: "Login failed",
-        description: "Invalid email or password.",
-        variant: "destructive"
-      });
-      return false;
-    }
-  } catch (error) {
-    console.error("Login error:", error);
-    toast({
-      title: "Login failed",
-      description: "An unexpected error occurred.",
-      variant: "destructive"
-    });
-    return false;
-  }
-};
-
 // Sign in with OAuth provider (Google, GitHub, etc.)
 export const signInWithProvider = async (provider: 'google' | 'github'): Promise<boolean> => {
   try {
@@ -195,10 +216,4 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
 // Get current user's encryption key
 export const getCurrentUserEncryptionKey = (): string | null => {
   return localStorage.getItem('encryption_key');
-};
-
-// Log out the current user
-export const logoutUser = async (): Promise<void> => {
-  localStorage.removeItem('encryption_key');
-  await supabase.auth.signOut();
 };
