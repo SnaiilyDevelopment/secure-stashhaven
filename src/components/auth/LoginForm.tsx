@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, KeyRound, ArrowRight, Loader2 } from 'lucide-react';
@@ -117,8 +116,11 @@ const LoginForm: React.FC = () => {
           description: "Welcome back to your secure vault.",
         });
         
-        // Explicitly navigate to dashboard on successful login
-        navigate('/dashboard', { replace: true });
+        // Force redirect to dashboard
+        console.log("Login successful, redirecting to dashboard...");
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 500); // Short delay to ensure the toast is shown
       }
     } catch (error) {
       console.error("Login error:", error);

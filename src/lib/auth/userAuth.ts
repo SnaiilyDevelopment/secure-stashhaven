@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,6 +96,8 @@ export const registerUser = async (email: string, password: string): Promise<boo
 // Login a user with email/password
 export const loginUser = async (email: string, password: string): Promise<boolean> => {
   try {
+    console.log("Attempting login for user:", email);
+    
     // Sign in with Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -104,6 +105,7 @@ export const loginUser = async (email: string, password: string): Promise<boolea
     });
     
     if (error || !data.user) {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
         description: error?.message || "Invalid email or password.",
@@ -116,6 +118,7 @@ export const loginUser = async (email: string, password: string): Promise<boolea
     const encryptedMasterKey = data.user.user_metadata.encryptedMasterKey;
     
     if (!salt || !encryptedMasterKey) {
+      console.error("Missing user metadata:", { salt, encryptedMasterKey });
       toast({
         title: "Login failed",
         description: "User data is corrupted. Please contact support.",
@@ -134,14 +137,11 @@ export const loginUser = async (email: string, password: string): Promise<boolea
       // Store encryption key
       localStorage.setItem('encryption_key', masterKeyBase64);
       
-      toast({
-        title: "Login successful",
-        description: "Welcome back to your secure vault."
-      });
-      
+      console.log("Login successful, encryption key stored");
       return true;
     } catch (error) {
       // Decryption failed - wrong password
+      console.error("Decryption failed:", error);
       toast({
         title: "Login failed",
         description: "Invalid email or password.",

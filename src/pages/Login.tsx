@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LockKeyhole } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,13 +10,16 @@ import { toast } from '@/components/ui/use-toast';
 
 const Login = () => {
   const navigate = useNavigate();
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        setCheckingAuth(true);
         const authenticated = await isAuthenticated();
         if (authenticated) {
-          navigate('/dashboard');
+          console.log("User already authenticated, redirecting to dashboard");
+          navigate('/dashboard', { replace: true });
         }
       } catch (error) {
         console.error("Authentication check failed:", error);
@@ -25,11 +28,35 @@ const Login = () => {
           description: "There was a problem checking your authentication status.",
           variant: "destructive"
         });
+      } finally {
+        setCheckingAuth(false);
       }
     };
     
+    // Set a timeout to ensure the check doesn't hang
+    const authTimeout = setTimeout(() => {
+      if (checkingAuth) {
+        console.log("Auth check timed out, allowing login page to display");
+        setCheckingAuth(false);
+      }
+    }, 3000);
+    
     checkAuth();
+    
+    return () => clearTimeout(authTimeout);
   }, [navigate]);
+
+  // Show a simple loading state while checking auth
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-green-50">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-green-600 border-t-transparent animate-spin mx-auto mb-4"></div>
+          <p className="text-green-800">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">

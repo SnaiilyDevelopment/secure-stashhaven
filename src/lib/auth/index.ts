@@ -6,8 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 // Check if user is authenticated
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
-    // Simplify auth check by checking both session and encryption key
-    const { data: { session } } = await supabase.auth.getSession();
+    // Check for session
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error("Session check error:", error);
+      return false;
+    }
     
     if (!session) {
       console.log("No session found, user not authenticated");
