@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const LOGIN_TIMEOUT = 15000; // 15 seconds
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -42,7 +43,14 @@ const LoginForm: React.FC = () => {
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           await supabase.auth.signOut();
-          localStorage.removeItem('encryption_key');
+          
+          // Try/catch around localStorage operations to handle SecurityErrors
+          try {
+            localStorage.removeItem('encryption_key');
+          } catch (error) {
+            console.error("Error clearing encryption key from localStorage:", error);
+            // We can still proceed even if this fails
+          }
         }
       } catch (error) {
         console.error("Error clearing authentication:", error);
@@ -98,17 +106,27 @@ const LoginForm: React.FC = () => {
       // Add a timeout to prevent hanging on login
       const loginPromise = loginUser(email, password);
       const timeoutPromise = new Promise<boolean>((_, reject) => {
-        setTimeout(() => reject(new Error("Login timed out")), 15000);
+        setTimeout(() => reject(new Error("Login timed out")), LOGIN_TIMEOUT);
       });
       
       const success = await Promise.race([loginPromise, timeoutPromise])
         .catch(error => {
           console.error("Login error:", error);
-          toast({
-            title: "Login Failed",
-            description: "The login process failed. Please try again.",
-            variant: "destructive"
-          });
+          
+          // Special handling for SecurityError
+          if (error instanceof Error && error.name === 'SecurityError') {
+            toast({
+              title: "Browser Security Restriction",
+              description: "Your browser's security settings are preventing login. Try enabling third-party cookies or using a different browser.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Login Failed",
+              description: "The login process failed. Please try again.",
+              variant: "destructive"
+            });
+          }
           return false;
         });
       

@@ -9,7 +9,8 @@ export enum AuthError {
   SESSION = "session_error",
   ENCRYPTION = "encryption_error",
   UNKNOWN = "unknown_error",
-  TIMEOUT = "timeout_error"
+  TIMEOUT = "timeout_error",
+  SECURITY = "security_error"
 }
 
 // Authentication status interface with more detailed error info
@@ -39,6 +40,17 @@ export const isAuthenticated = async (): Promise<AuthStatus> => {
     return await Promise.race([authCheckPromise, timeoutPromise]);
   } catch (error) {
     console.error("Authentication check error:", error);
+    
+    // Handle SecurityError specially - this is likely from the browser security policy
+    if (error instanceof Error && error.name === 'SecurityError') {
+      console.log("Caught SecurityError during auth check, treating as recoverable");
+      return {
+        authenticated: false,
+        error: AuthError.SECURITY,
+        errorMessage: "Security restriction encountered. This is usually temporary.",
+        retryable: true
+      };
+    }
     
     // Determine if the error is a timeout
     if (error instanceof Error && error.message === 'Authentication check timed out') {
@@ -118,23 +130,36 @@ const performAuthCheck = async (): Promise<AuthStatus> => {
       return { authenticated: true, retryable: false };
     }
     
-    // For email/password users, check both session and encryption key
-    const hasEncryptionKey = !!localStorage.getItem('encryption_key');
-    console.log("Email user authenticated, encryption key present:", hasEncryptionKey);
-    
-    if (!hasEncryptionKey) {
-      console.log("No encryption key found, user not fully authenticated");
-      // Clear the session if we don't have an encryption key
-      await supabase.auth.signOut();
-      return {
-        authenticated: false,
-        error: AuthError.ENCRYPTION,
-        errorMessage: "Your encryption key is missing. Please login again to regenerate it.",
-        retryable: true
-      };
+    // For email/password users, check both session and encryption key with error catching
+    try {
+      const hasEncryptionKey = !!localStorage.getItem('encryption_key');
+      console.log("Email user authenticated, encryption key present:", hasEncryptionKey);
+      
+      if (!hasEncryptionKey) {
+        console.log("No encryption key found, user not fully authenticated");
+        // Clear the session if we don't have an encryption key
+        await supabase.auth.signOut();
+        return {
+          authenticated: false,
+          error: AuthError.ENCRYPTION,
+          errorMessage: "Your encryption key is missing. Please login again to regenerate it.",
+          retryable: true
+        };
+      }
+      
+      return { authenticated: true, retryable: false };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'SecurityError') {
+        console.error("Security error accessing localStorage:", error);
+        return {
+          authenticated: false,
+          error: AuthError.SECURITY,
+          errorMessage: "Browser security restrictions are preventing authentication. Try using a different browser or enable third-party cookies.",
+          retryable: true
+        };
+      }
+      throw error; // Re-throw other errors
     }
-    
-    return { authenticated: true, retryable: false };
   } catch (error) {
     console.error("Authentication check error in performAuthCheck:", error);
     throw error; // Re-throw to be caught by the outer function
@@ -151,7 +176,8 @@ export const handleAuthError = (authStatus: AuthStatus): void => {
       [AuthError.CONNECTION]: "Connection Error",
       [AuthError.SESSION]: "Session Error",
       [AuthError.ENCRYPTION]: "Security Error",
-      [AuthError.TIMEOUT]: "Timeout Error"
+      [AuthError.TIMEOUT]: "Timeout Error",
+      [AuthError.SECURITY]: "Browser Security Error"
     }[authStatus.error] || "Authentication Error";
   
   const description = authStatus.errorMessage || {
@@ -159,6 +185,7 @@ export const handleAuthError = (authStatus: AuthStatus): void => {
     [AuthError.SESSION]: "There was a problem with your login session. Please try logging in again.",
     [AuthError.ENCRYPTION]: "There was a problem with your encryption key. Please log in again to restore secure access.",
     [AuthError.TIMEOUT]: "The authentication check timed out. Please try again.",
+    [AuthError.SECURITY]: "Browser security restrictions are preventing authentication. Try using a different browser or enable third-party cookies.",
     [AuthError.UNKNOWN]: "An unexpected error occurred. Please try logging in again."
   }[authStatus.error];
   

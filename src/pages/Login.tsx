@@ -1,39 +1,58 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LockKeyhole, RefreshCw } from 'lucide-react';
+import { LockKeyhole, RefreshCw, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { isAuthenticated, handleAuthError, AuthError, AuthStatus } from '@/lib/auth';
 import ThreeDBackground from '@/components/3DBackground';
 import LoginForm from '@/components/auth/LoginForm';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+
+const MAX_AUTH_ATTEMPTS = 3;
 
 const Login = () => {
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [authAttempts, setAuthAttempts] = useState(0);
 
   const checkAuth = async () => {
+    // Prevent excessive auth checks
+    if (authAttempts >= MAX_AUTH_ATTEMPTS) {
+      console.log(`Reached max auth attempts (${MAX_AUTH_ATTEMPTS}), skipping check`);
+      setCheckingAuth(false);
+      setAuthStatus({
+        authenticated: false,
+        error: AuthError.UNKNOWN,
+        errorMessage: "Too many authentication attempts. Please try logging in manually.",
+        retryable: false
+      });
+      return;
+    }
+
+    setAuthAttempts(prev => prev + 1);
+    
     try {
       setCheckingAuth(true);
       console.log("Checking authentication status...");
       
-      // First check if we have a session
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Session check error:", sessionError);
-        throw sessionError;
-      }
-      
-      // If we have a session and encryption key, consider authenticated
-      if (sessionData.session && localStorage.getItem('encryption_key')) {
-        console.log("Session and encryption key found, redirecting to dashboard");
-        navigate('/dashboard', { replace: true });
-        return;
+      try {
+        // First check if we have a session and encryption key (fast path)
+        const { data: sessionData } = await supabase.auth.getSession();
+        const hasEncryptionKey = !!localStorage.getItem('encryption_key');
+        
+        if (sessionData.session && hasEncryptionKey) {
+          console.log("Session and encryption key found, redirecting to dashboard");
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+      } catch (e) {
+        console.error("Error in fast path session check:", e);
+        // Continue to full auth check
       }
       
       // Fallback to enhanced authentication check with better error handling
@@ -81,7 +100,10 @@ const Login = () => {
       }
     }, 2000);
     
-    checkAuth();
+    // Only check auth on initial load and retries, not on every render
+    if (retryCount > 0 || authAttempts === 0) {
+      checkAuth();
+    }
     
     return () => clearTimeout(authTimeout);
   }, [navigate, retryCount]); // Added retryCount dependency to trigger recheck
@@ -108,6 +130,9 @@ const Login = () => {
     );
   }
 
+  // Check for specific security errors that might be related to CORS
+  const hasBrowserSecurityError = authStatus?.error === AuthError.SECURITY;
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">
       {/* 3D Interactive Background */}
@@ -124,8 +149,24 @@ const Login = () => {
           <p className="text-green-700/80 mt-2">Sign in to access your secure vault</p>
         </div>
         
+        {/* Show special alert for security errors */}
+        {hasBrowserSecurityError && (
+          <Alert variant="destructive" className="mb-4 backdrop-blur-sm bg-red-50/90 border-red-200">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Browser Security Restrictions</AlertTitle>
+            <AlertDescription>
+              Your browser's security settings may be preventing proper authentication. Try:
+              <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
+                <li>Enabling third-party cookies</li>
+                <li>Using a different browser</li>
+                <li>Disabling tracking protection for this site</li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* Show error alert with retry button if there's an auth error */}
-        {authStatus?.error && authStatus.retryable && (
+        {authStatus?.error && authStatus.retryable && !hasBrowserSecurityError && (
           <Alert variant="destructive" className="mb-4 backdrop-blur-sm bg-red-50/90 border-red-200">
             <AlertDescription className="flex items-center justify-between">
               <span>{authStatus.errorMessage || "There was a problem with authentication. Please try again."}</span>

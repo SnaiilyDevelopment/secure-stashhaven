@@ -21,6 +21,27 @@
     <script>
       window.addEventListener('error', function(event) {
         console.error('Global error caught:', event.error);
+        
+        // Check if this is a SecurityError with Cloudflare Insights
+        if (event.error && event.error.name === 'SecurityError' && 
+            event.error.message && event.error.message.includes('insecure')) {
+          console.log('Suppressing SecurityError related to Cloudflare Insights');
+          // Prevent the error from bubbling up
+          event.preventDefault();
+        }
+      });
+      
+      // Handle unhandled promise rejections
+      window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        
+        // Check if this is related to CORS or SecurityError
+        if (event.reason && 
+            (event.reason.name === 'SecurityError' || 
+             (event.reason.message && event.reason.message.includes('CORS')))) {
+          console.log('Suppressing CORS or security-related promise rejection');
+          event.preventDefault();
+        }
       });
     </script>
   </body>
