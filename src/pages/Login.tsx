@@ -3,56 +3,69 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LockKeyhole } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, handleAuthError, AuthError } from '@/lib/auth';
 import ThreeDBackground from '@/components/3DBackground';
 import LoginForm from '@/components/auth/LoginForm';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authError, setAuthError] = useState<AuthError | undefined>(undefined);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const checkAuth = async () => {
+    try {
+      setCheckingAuth(true);
+      console.log("Checking authentication status...");
+      
+      // First check if we have a session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error("Session check error:", sessionError);
+        throw sessionError;
+      }
+      
+      // If we have a session and encryption key, consider authenticated
+      if (sessionData.session && localStorage.getItem('encryption_key')) {
+        console.log("Session and encryption key found, redirecting to dashboard");
+        navigate('/dashboard', { replace: true });
+        return;
+      }
+      
+      // Fallback to original authentication check with enhanced error handling
+      const { authenticated, error } = await isAuthenticated();
+      
+      if (error) {
+        console.error("Authentication error:", error);
+        setAuthError(error);
+        handleAuthError(error);
+      }
+      
+      if (authenticated) {
+        console.log("User authenticated via isAuthenticated(), redirecting to dashboard");
+        navigate('/dashboard', { replace: true });
+      } else {
+        console.log("User not authenticated, showing login page");
+      }
+    } catch (error) {
+      console.error("Authentication check failed:", error);
+      setAuthError(AuthError.UNKNOWN);
+      toast({
+        title: "Authentication Error",
+        description: "There was a problem checking your authentication status.",
+        variant: "destructive"
+      });
+    } finally {
+      setCheckingAuth(false);
+    }
+  };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        setCheckingAuth(true);
-        console.log("Checking authentication status...");
-        
-        // First check if we have a session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) {
-          console.error("Session check error:", sessionError);
-          throw sessionError;
-        }
-        
-        // If we have a session and encryption key, consider authenticated
-        if (sessionData.session && localStorage.getItem('encryption_key')) {
-          console.log("Session and encryption key found, redirecting to dashboard");
-          navigate('/dashboard', { replace: true });
-          return;
-        }
-        
-        // Fallback to original authentication check
-        const authenticated = await isAuthenticated();
-        if (authenticated) {
-          console.log("User authenticated via isAuthenticated(), redirecting to dashboard");
-          navigate('/dashboard', { replace: true });
-        } else {
-          console.log("User not authenticated, showing login page");
-        }
-      } catch (error) {
-        console.error("Authentication check failed:", error);
-        toast({
-          title: "Authentication Error",
-          description: "There was a problem checking your authentication status.",
-          variant: "destructive"
-        });
-      } finally {
-        setCheckingAuth(false);
-      }
-    };
-    
     // Set a short timeout to ensure the check doesn't hang
     const authTimeout = setTimeout(() => {
       if (checkingAuth) {
@@ -64,7 +77,13 @@ const Login = () => {
     checkAuth();
     
     return () => clearTimeout(authTimeout);
-  }, [navigate]);
+  }, [navigate, retryCount]); // Added retryCount dependency to trigger recheck
+
+  // Function to retry authentication
+  const handleRetryAuth = () => {
+    setRetryCount(prev => prev + 1);
+    setAuthError(undefined);
+  };
 
   // Show a simple loading state while checking auth
   if (checkingAuth) {
@@ -93,6 +112,23 @@ const Login = () => {
           <h1 className="text-2xl font-medium tracking-tight text-green-800">Welcome to SafeHaven</h1>
           <p className="text-green-700/80 mt-2">Sign in to access your secure vault</p>
         </div>
+        
+        {/* Show error alert with retry button if there's an auth error */}
+        {authError && (
+          <Alert variant="destructive" className="mb-4 backdrop-blur-sm bg-red-50/90 border-red-200">
+            <AlertDescription className="flex items-center justify-between">
+              <span>There was a problem with authentication. Please try again.</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRetryAuth} 
+                className="ml-2 bg-white hover:bg-green-50"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         
         <Card className="animate-scale-in border-green-100 shadow-lg backdrop-blur-sm bg-white/70">
           <CardHeader>
