@@ -1,7 +1,11 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { encryptFile, decryptFile, getCurrentUserEncryptionKey } from "../encryption";
+import { encryptFile, decryptFile } from "../encryption";
+
+// Get current user's encryption key (from localStorage)
+export const getCurrentUserEncryptionKey = (): string | null => {
+  return localStorage.getItem('encryption_key');
+};
 
 // Upload an encrypted file to Supabase storage
 export const uploadEncryptedFile = async (

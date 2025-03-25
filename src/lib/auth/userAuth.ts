@@ -1,5 +1,12 @@
 import { toast } from "@/components/ui/use-toast";
-import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey, zeroBuffer } from "../encryption";
+import { 
+  deriveKeyFromPassword, 
+  encryptTextSecure, 
+  decryptTextSecure, 
+  generateEncryptionKey, 
+  zeroBuffer,
+  arrayBufferToBase64
+} from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
 
 // Maximum number of login attempts before rate limiting
@@ -88,7 +95,7 @@ export const loginUser = async (email: string, password: string): Promise<boolea
       
       try {
         // Attempt to decrypt the master key (this will fail if password is wrong)
-        const masterKeyBase64 = await decryptText(encryptedMasterKey, derivedKey);
+        const masterKeyBase64 = await decryptTextSecure(encryptedMasterKey, derivedKey);
         
         // Store encryption key
         localStorage.setItem('encryption_key', masterKeyBase64);
@@ -258,15 +265,10 @@ export const registerUser = async (email: string, password: string, confirmPassw
     zeroBuffer(passwordBytes.buffer);
     
     // Generate a random encryption master key
-    const masterKeyBuffer = new Uint8Array(32);
-    window.crypto.getRandomValues(masterKeyBuffer);
-    const masterKeyBase64 = arrayBufferToBase64(masterKeyBuffer.buffer);
+    const masterKeyBase64 = await generateEncryptionKey();
     
     // Encrypt the master key with the derived key
-    const encryptedMasterKey = await encryptText(masterKeyBase64, derivedKey);
-    
-    // Zero out the master key buffer after encryption
-    zeroBuffer(masterKeyBuffer.buffer);
+    const encryptedMasterKey = await encryptTextSecure(masterKeyBase64, derivedKey);
     
     try {
       // Sign up with Supabase
