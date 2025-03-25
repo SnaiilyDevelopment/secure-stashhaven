@@ -9,6 +9,3 @@ export * from './core';
 export * from './fileEncryption';
 export * from './textEncryption';
 export * from './deviceKeys';
-
-// Export component 
-export { default as IVReuseAlert } from '@/components/encryption/IVReuseAlert';
