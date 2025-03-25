@@ -4,28 +4,26 @@
  */
 
 import { importEncryptionKey, arrayBufferToBase64, base64ToArrayBuffer } from './core';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
-import { Shield } from 'lucide-react';
 
 // IV tracking for reuse protection
-interface IVMetadata {
+export interface IVMetadata {
   iv: string;
   timestamp: number;
   useCount: number;
 }
 
 // Maximum number of IVs to track (default: 1000)
-const DEFAULT_MAX_IV_COUNT = 1000;
+export const DEFAULT_MAX_IV_COUNT = 1000;
 
 // Period after which IVs are removed from tracking (default: 24 hours in milliseconds)
-const DEFAULT_IV_REMOVAL_PERIOD = 24 * 60 * 60 * 1000;
+export const DEFAULT_IV_REMOVAL_PERIOD = 24 * 60 * 60 * 1000;
 
 // Store used IVs with timestamps and counts
-let usedIVs: IVMetadata[] = [];
+export let usedIVs: IVMetadata[] = [];
 
 // Clean up old IVs
-const cleanupOldIVs = (maxIVCount: number = DEFAULT_MAX_IV_COUNT, removalPeriod: number = DEFAULT_IV_REMOVAL_PERIOD) => {
+export const cleanupOldIVs = (maxIVCount: number = DEFAULT_MAX_IV_COUNT, removalPeriod: number = DEFAULT_IV_REMOVAL_PERIOD) => {
   const now = Date.now();
   
   // Remove IVs older than removalPeriod
@@ -47,7 +45,7 @@ const cleanupOldIVs = (maxIVCount: number = DEFAULT_MAX_IV_COUNT, removalPeriod:
 };
 
 // Check if an IV has been used before and track it
-const trackIV = (iv: Uint8Array, maxIVCount: number = DEFAULT_MAX_IV_COUNT, removalPeriod: number = DEFAULT_IV_REMOVAL_PERIOD): boolean => {
+export const trackIV = (iv: Uint8Array, maxIVCount: number = DEFAULT_MAX_IV_COUNT, removalPeriod: number = DEFAULT_IV_REMOVAL_PERIOD): boolean => {
   const ivBase64 = arrayBufferToBase64(iv.buffer);
   const now = Date.now();
   
@@ -218,23 +216,4 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
     const errorMessage = error instanceof Error ? error.message : "Unknown decryption error";
     throw new EncryptionError(errorMessage, "DECRYPTION_PROCESS_FAILED", error);
   }
-};
-
-// Security notice alert component for IV reuse warnings
-export const IVReuseAlert = ({ maxIVCount = DEFAULT_MAX_IV_COUNT, removalPeriod = DEFAULT_IV_REMOVAL_PERIOD }: { maxIVCount?: number, removalPeriod?: number }) => {
-  // Only show if we have a lot of IVs tracked
-  if (usedIVs.length < maxIVCount * 0.8) {
-    return null;
-  }
-  
-  return (
-    <Alert variant="default" className="bg-yellow-50 border-yellow-200">
-      <Shield className="h-4 w-4 text-yellow-500" />
-      <AlertTitle>Security Notice</AlertTitle>
-      <AlertDescription>
-        A large number of encryption IVs are being tracked ({usedIVs.length}/{maxIVCount}).
-        Some older IVs may be automatically removed for security purposes.
-      </AlertDescription>
-    </Alert>
-  );
 };
