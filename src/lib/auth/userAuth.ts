@@ -1,10 +1,11 @@
+
 import { toast } from "@/components/ui/use-toast";
 import { 
   deriveKeyFromPassword, 
   encryptText, 
   decryptText, 
   generateEncryptionKey, 
-  zeroBuffer
+  zeroBuffer 
 } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
 

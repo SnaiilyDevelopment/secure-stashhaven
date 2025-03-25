@@ -19,6 +19,8 @@ export {
 export { 
   encryptText,
   decryptText,
+  encryptTextSecure,
+  decryptTextSecure,
   TextEncryptionError,
   TextDecryptionError
 } from './textEncryption';
