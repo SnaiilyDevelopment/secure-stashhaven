@@ -20,28 +20,10 @@ interface FileItem {
   encrypted: boolean;
 }
 
-// Create an adapter function to convert our FileItem to match the expected props
-const adaptFilesForList = (
-  files: FileItem[],
-  searchQuery: string,
-  downloadHandler: (id: string) => Promise<void>,
-  deleteHandler: (id: string) => void
-) => {
-  return {
-    files: files.filter(file => 
-      file.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-    onDeleteComplete: () => {}, // We'll handle this directly in the component
-    isLoading: false,
-    emptyMessage: "No files found. Upload your first encrypted file.",
-  };
-};
-
 const Dashboard = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -248,14 +230,17 @@ const Dashboard = () => {
         </header>
         
         <FileList 
-          {...adaptFilesForList(files, searchQuery, downloadFile, deleteFile)}
+          files={files.filter(file => 
+            file.name.toLowerCase().includes(searchQuery.toLowerCase())
+          )}
           isLoading={isUploading}
           onDeleteComplete={() => {
             // This function will be called after file deletion
             console.log('File deletion completed');
           }}
-          onViewFile={(fileId) => downloadFile(fileId)}
-          onDeleteFile={(fileId) => deleteFile(fileId)}
+          downloadFile={downloadFile}
+          deleteFile={deleteFile}
+          emptyMessage="No files found. Upload your first encrypted file."
         />
       </div>
     </ThreeDLayout>

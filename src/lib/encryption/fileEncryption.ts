@@ -7,8 +7,7 @@
 import { 
   generateEncryptionKey, 
   importEncryptionKey,
-  arrayBufferToBase64,
-  base64ToArrayBuffer
+  exportEncryptionKey
 } from './core';
 
 // Custom error classes for better error handling

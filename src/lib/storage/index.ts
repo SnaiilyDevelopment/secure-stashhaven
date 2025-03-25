@@ -1,19 +1,19 @@
 
 // Re-export all storage functions
 export { 
-  uploadEncryptedFile, 
-  downloadEncryptedFile, 
-  deleteFile 
+  uploadFile, 
+  deleteFile,
+  getUserFiles,
+  getUserStorageUsage,
+  type FileMetadata
 } from './fileOperations';
 
 export { 
   listUserFiles, 
-  getFileMetadata,
-  type FileMetadata
+  getFileMetadata
 } from './fileManagement';
 
 export {
-  getUserStorageUsage,
   formatBytes,
   ensureStorageBucket
 } from './storageUtils';

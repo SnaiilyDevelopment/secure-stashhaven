@@ -15,8 +15,10 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { uploadEncryptedFile } from '@/lib/storage';
+import { uploadFile } from '@/lib/storage';
 import { ensureStorageBucket } from '@/lib/storage/storageUtils';
+import { getCurrentUser } from '@/lib/auth';
+import { toast } from '@/components/ui/use-toast';
 
 interface UploadDialogProps {
   open: boolean;
@@ -70,23 +72,31 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         });
       }, 500);
       
-      // Use uploadEncryptedFile to handle the upload
-      const filePath = await uploadEncryptedFile(selectedFile, BUCKET_NAME, undefined, (p) => {
-        if (p === 100) {
-          clearInterval(progressInterval);
-        }
-        setProgress(p);
-      });
+      // Get the current user
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        throw new Error("You must be logged in to upload files");
+      }
       
+      // Upload the file
+      const fileMetadata = await uploadFile(selectedFile, currentUser.id);
+      
+      // Update progress to 100% when upload is complete
       clearInterval(progressInterval);
       setProgress(100);
       
-      if (!filePath) {
+      if (!fileMetadata) {
         throw new Error("Upload failed");
       }
       
       // Reset the form after successful upload
       setSelectedFile(null);
+      
+      // Show success message
+      toast({
+        title: "File uploaded",
+        description: `${selectedFile.name} has been encrypted and uploaded.`
+      });
       
       // Close the dialog and refresh the file list
       setTimeout(() => {
@@ -94,9 +104,9 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         onUploadComplete();
       }, 500);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error("File upload error:", err);
-      setError("Failed to upload file. Please try again.");
+      setError(err.message || "Failed to upload file. Please try again.");
     } finally {
       setIsUploading(false);
     }

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -52,7 +53,7 @@ export const uploadFile = async (file: File, userId: string): Promise<FileMetada
     };
     
     const { error: metadataError } = await supabase
-      .from('files')
+      .from('file_metadata')  // Changed from 'files' to 'file_metadata' to match the database schema
       .insert([fileMetadata]);
     
     if (metadataError) {
@@ -74,13 +75,13 @@ export const uploadFile = async (file: File, userId: string): Promise<FileMetada
 /**
  * Deletes a file from Supabase storage and removes its metadata.
  * @param {string} fileId The ID of the file to delete.
- * @returns {Promise<void>} A promise that resolves when the file is deleted.
+ * @returns {Promise<boolean>} A promise that resolves with true when the file is deleted.
  */
-export const deleteFile = async (fileId: string): Promise<void> => {
+export const deleteFile = async (fileId: string): Promise<boolean> => {
   try {
     // Get the file metadata from the database
     const { data: fileMetadata, error: selectError } = await supabase
-      .from('files')
+      .from('file_metadata')  // Changed from 'files' to 'file_metadata'
       .select('*')
       .eq('id', fileId)
       .single();
@@ -104,13 +105,15 @@ export const deleteFile = async (fileId: string): Promise<void> => {
     
     // Remove the file metadata from the database
     const { error: removeError } = await supabase
-      .from('files')
+      .from('file_metadata')  // Changed from 'files' to 'file_metadata'
       .delete()
       .eq('id', fileId);
     
     if (removeError) {
       throw new Error(`Failed to remove file metadata: ${removeError.message}`);
     }
+
+    return true;
   } catch (error: any) {
     console.error('Delete error:', error);
     throw error;
@@ -125,7 +128,7 @@ export const deleteFile = async (fileId: string): Promise<void> => {
 export const getUserFiles = async (userId: string): Promise<FileMetadata[]> => {
   try {
     const { data, error } = await supabase
-      .from('files')
+      .from('file_metadata')  // Changed from 'files' to 'file_metadata'
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -143,7 +146,6 @@ export const getUserFiles = async (userId: string): Promise<FileMetadata[]> => {
 
 /**
  * Retrieves the storage usage for a specific user.
- * @param {string} userId The ID of the user.
  * @returns {Promise<number>} A promise that resolves with the total storage used in bytes.
  */
 export const getUserStorageUsage = async (): Promise<number> => {
@@ -151,7 +153,7 @@ export const getUserStorageUsage = async (): Promise<number> => {
     // List all the objects in the storage bucket for the user
     const { data, error } = await supabase.storage
       .from('secure-vault-files')
-      .list('uploads/', { // changed prefix to 'uploads/'
+      .list('uploads/', { 
         search: '',
         sortBy: { column: 'created_at', order: 'asc' },
       });
@@ -161,7 +163,7 @@ export const getUserStorageUsage = async (): Promise<number> => {
     }
     
     // Calculate the total size of all files
-    const totalBytes = data?.reduce((sum, file) => sum + file.metadata.size, 0) || 0;
+    const totalBytes = data?.reduce((sum, file) => sum + (file.metadata?.size || 0), 0) || 0;
     return totalBytes;
   } catch (error: any) {
     console.error('Get user storage usage error:', error);
