@@ -1,4 +1,3 @@
-
 /**
  * Core encryption utilities for end-to-end encryption
  * Implements secure encryption practices inspired by Matrix E2EE concepts
@@ -14,19 +13,20 @@ export const timingSafeEqual = async (a: ArrayBuffer, b: ArrayBuffer): Promise<b
     return false;
   }
 
-  // Fall back to Web Crypto API timingSafeEqual if available
-  if ('timingSafeEqual' in crypto.subtle) {
-    try {
+  // Use feature detection with try/catch instead of browser support check
+  try {
+    // Attempt to use Web Crypto API timingSafeEqual if available
+    if ('timingSafeEqual' in crypto.subtle) {
       const subtle = crypto.subtle as typeof crypto.subtle & {
         timingSafeEqual: (a: Uint8Array, b: Uint8Array) => boolean
       };
       return subtle.timingSafeEqual(aBytes, bBytes);
-    } catch {
-      // Fall through to WASM implementation
     }
+  } catch (error) {
+    // Fall through to WASM implementation
   }
 
-  // Final fallback to WASM constant-time comparison
+  // Use WASM constant-time comparison
   try {
     const wasmModule = await import('./wasm/timingSafeEqual');
     return wasmModule.compare(aBytes, bBytes);
@@ -165,8 +165,13 @@ const MIN_KEY_LIFETIME_MS = 24 * 60 * 60 * 1000; // Minimum 1 day between rotati
 // Benchmark PBKDF2 iterations with enhanced security
 const benchmarkPBKDF2Iterations = async (): Promise<number> => {
   try {
-    const testPassword = 'benchmark-test-password-' + Math.random().toString(36).slice(2);
+    // Use crypto.getRandomValues instead of Math.random for better randomness
     const salt = window.crypto.getRandomValues(new Uint8Array(32));
+    const testPasswordBytes = new Uint8Array(32);
+    window.crypto.getRandomValues(testPasswordBytes);
+    const testPassword = Array.from(testPasswordBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
     
     // Run benchmark 5 times for better accuracy
     const durations: number[] = [];
@@ -218,6 +223,11 @@ const benchmarkPBKDF2Iterations = async (): Promise<number> => {
   } catch (error) {
     console.error('PBKDF2 benchmark failed:', error);
     return MIN_PBKDF2_ITERATIONS; // Fallback to minimum
+  } finally {
+    // Clear any sensitive data
+    if (typeof testPasswordBytes !== 'undefined') {
+      zeroBuffer(testPasswordBytes.buffer);
+    }
   }
 };
 
@@ -375,3 +385,4 @@ export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer
     throw new Error(`Key derivation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
+

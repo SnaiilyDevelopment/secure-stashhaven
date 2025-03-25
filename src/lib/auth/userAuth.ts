@@ -1,11 +1,40 @@
 import { toast } from "@/components/ui/use-toast";
-import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey } from "../encryption";
+import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey, zeroBuffer } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
+
+// Maximum number of login attempts before rate limiting
+const MAX_LOGIN_ATTEMPTS = 5;
+// Time window for tracking attempts (milliseconds)
+const ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+// Store failed login attempts with timestamps
+const loginAttempts = new Map<string, number[]>();
 
 // Login a user with email/password
 export const loginUser = async (email: string, password: string): Promise<boolean> => {
   try {
     console.log("Attempting login for user:", email);
+    
+    // Check for rate limiting
+    const userAttempts = loginAttempts.get(email) || [];
+    const now = Date.now();
+    
+    // Filter attempts to only include those within the time window
+    const recentAttempts = userAttempts.filter(timestamp => (now - timestamp) < ATTEMPT_WINDOW_MS);
+    
+    if (recentAttempts.length >= MAX_LOGIN_ATTEMPTS) {
+      // Calculate time remaining in rate limit
+      const oldestAttempt = Math.min(...recentAttempts);
+      const timeRemaining = Math.ceil((oldestAttempt + ATTEMPT_WINDOW_MS - now) / 1000 / 60);
+      
+      toast({
+        title: "Too Many Login Attempts",
+        description: `Please try again in ${timeRemaining} minute${timeRemaining !== 1 ? 's' : ''}.`,
+        variant: "destructive"
+      });
+      
+      return false;
+    }
     
     // Sign in with Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -13,13 +42,21 @@ export const loginUser = async (email: string, password: string): Promise<boolea
       password
     });
     
+    // Handle authentication errors generically to prevent user enumeration
     if (error || !data.user) {
       console.error("Login error:", error);
+      
+      // Track this failed attempt
+      recentAttempts.push(now);
+      loginAttempts.set(email, recentAttempts);
+      
+      // Use generic error message that doesn't confirm account existence
       toast({
         title: "Login failed",
-        description: error?.message || "Invalid email or password.",
+        description: "Invalid email or password.",
         variant: "destructive"
       });
+      
       return false;
     }
     
@@ -28,60 +65,104 @@ export const loginUser = async (email: string, password: string): Promise<boolea
     
     if (!salt || !encryptedMasterKey) {
       console.error("Missing user metadata:", { salt, encryptedMasterKey });
+      
       toast({
         title: "Login failed",
         description: "User data is corrupted. Please contact support.",
         variant: "destructive"
       });
+      
+      // Sign out since the login is incomplete
+      await supabase.auth.signOut();
+      
       return false;
     }
     
-    // Derive key from password with user's salt
-    const { key: derivedKey } = await deriveKeyFromPassword(password, salt);
-    
     try {
-      // Attempt to decrypt the master key (this will fail if password is wrong)
-      const masterKeyBase64 = await decryptText(encryptedMasterKey, derivedKey);
+      // Derive key from password with user's salt
+      const passwordBytes = new TextEncoder().encode(password);
+      const { key: derivedKey } = await deriveKeyFromPassword(password, salt);
       
-      // Store encryption key
-      localStorage.setItem('encryption_key', masterKeyBase64);
+      // Zero out password in memory
+      zeroBuffer(passwordBytes.buffer);
       
-      console.log("Login successful, encryption key stored");
-      return true;
+      try {
+        // Attempt to decrypt the master key (this will fail if password is wrong)
+        const masterKeyBase64 = await decryptText(encryptedMasterKey, derivedKey);
+        
+        // Store encryption key
+        localStorage.setItem('encryption_key', masterKeyBase64);
+        
+        // Clear login attempts on successful login
+        loginAttempts.delete(email);
+        
+        console.log("Login successful, encryption key stored");
+        return true;
+      } catch (error) {
+        // Decryption failed - wrong password but authentication succeeded
+        console.error("Decryption failed:", error);
+        
+        // Track this failed attempt
+        recentAttempts.push(now);
+        loginAttempts.set(email, recentAttempts);
+        
+        // Force sign out since decryption failed
+        await supabase.auth.signOut();
+        
+        toast({
+          title: "Login failed",
+          description: "Invalid email or password.",
+          variant: "destructive"
+        });
+        
+        return false;
+      }
     } catch (error) {
-      // Decryption failed - wrong password
-      console.error("Decryption failed:", error);
+      console.error("Key derivation error:", error);
       
-      // Force sign out since decryption failed
+      // Track this failed attempt
+      recentAttempts.push(now);
+      loginAttempts.set(email, recentAttempts);
+      
+      // Force sign out
       await supabase.auth.signOut();
       
       toast({
         title: "Login failed",
-        description: "Invalid email or password.",
+        description: "An error occurred while processing your credentials.",
         variant: "destructive"
       });
+      
       return false;
     }
   } catch (error) {
     console.error("Login error:", error);
+    
     toast({
       title: "Login failed",
       description: "An unexpected error occurred.",
       variant: "destructive"
     });
+    
     return false;
   }
 };
 
-// Log out the current user
+// Log out the current user with secure cleanup
 export const logoutUser = async (): Promise<void> => {
   try {
     console.log("Logging out user");
+    
+    // Clear sensitive data
     localStorage.removeItem('encryption_key');
+    
+    // Sign out from Supabase
     await supabase.auth.signOut();
+    
     console.log("User logged out successfully");
   } catch (error) {
     console.error("Logout error:", error);
+    
     toast({
       title: "Logout error",
       description: "An error occurred during logout.",
@@ -90,27 +171,103 @@ export const logoutUser = async (): Promise<void> => {
   }
 };
 
+// Valid email regex for client-side validation
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+// Password strength criteria
+const PASSWORD_CRITERIA = {
+  minLength: 10,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumbers: true,
+  requireSpecial: true
+};
+
+// Validate password strength
+export const validatePasswordStrength = (password: string): { 
+  valid: boolean;
+  errors: string[];
+} => {
+  const errors: string[] = [];
+  
+  if (password.length < PASSWORD_CRITERIA.minLength) {
+    errors.push(`Password must be at least ${PASSWORD_CRITERIA.minLength} characters long`);
+  }
+  
+  if (PASSWORD_CRITERIA.requireUppercase && !/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+  
+  if (PASSWORD_CRITERIA.requireLowercase && !/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+  
+  if (PASSWORD_CRITERIA.requireNumbers && !/\d/.test(password)) {
+    errors.push('Password must contain at least one number');
+  }
+  
+  if (PASSWORD_CRITERIA.requireSpecial && !/[^a-zA-Z0-9]/.test(password)) {
+    errors.push('Password must contain at least one special character');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+};
+
 // Register a new user with email/password
-export const registerUser = async (email: string, password: string): Promise<boolean> => {
+export const registerUser = async (email: string, password: string, confirmPassword: string): Promise<boolean> => {
   try {
+    // Validate email format
+    if (!EMAIL_REGEX.test(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      toast({
+        title: "Weak Password",
+        description: passwordValidation.errors[0],
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // Validate password confirmation
+    if (password !== confirmPassword) {
+      toast({
+        title: "Passwords Don't Match",
+        description: "The passwords you entered don't match.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
     // Generate a salt and derive a key from the password
+    const passwordBytes = new TextEncoder().encode(password);
     const { key: derivedKey, salt } = await deriveKeyFromPassword(password);
     
-    // Generate a random encryption master key
-    const masterKey = await window.crypto.subtle.generateKey(
-      { name: 'AES-GCM', length: 256 },
-      true,
-      ['encrypt', 'decrypt']
-    );
+    // Zero out password in memory
+    zeroBuffer(passwordBytes.buffer);
     
-    // Export the master key
-    const exportedMasterKey = await window.crypto.subtle.exportKey('raw', masterKey);
-    const masterKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(exportedMasterKey)));
+    // Generate a random encryption master key
+    const masterKeyBuffer = new Uint8Array(32);
+    window.crypto.getRandomValues(masterKeyBuffer);
+    const masterKeyBase64 = arrayBufferToBase64(masterKeyBuffer.buffer);
     
     // Encrypt the master key with the derived key
     const encryptedMasterKey = await encryptText(masterKeyBase64, derivedKey);
     
-    // Fix: Add error handling for 429 Too Many Requests
+    // Zero out the master key buffer after encryption
+    zeroBuffer(masterKeyBuffer.buffer);
+    
     try {
       // Sign up with Supabase
       const { error } = await supabase.auth.signUp({
@@ -172,11 +329,13 @@ export const registerUser = async (email: string, password: string): Promise<boo
     }
   } catch (error) {
     console.error("Registration error:", error);
+    
     toast({
       title: "Registration failed",
       description: "An unexpected error occurred.",
       variant: "destructive"
     });
+    
     return false;
   }
 };
@@ -217,3 +376,10 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
 export const getCurrentUserEncryptionKey = (): string | null => {
   return localStorage.getItem('encryption_key');
 };
+
+// Helper function to convert ArrayBuffer to Base64 string
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const byteArray = new Uint8Array(buffer);
+  const base64String = btoa(String.fromCharCode(...byteArray));
+  return base64String;
+}

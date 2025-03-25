@@ -1,3 +1,4 @@
+
 /**
  * WASM-based constant-time comparison
  * Uses WebAssembly for guaranteed constant-time operations
@@ -20,43 +21,75 @@ let wasmModule: {
   compare: (a: Uint8Array, b: Uint8Array) => boolean
 } | null = null;
 
+// Initialize WASM module with error handling
 export async function initWasm() {
   if (wasmModule) return;
 
-  const module = await WebAssembly.compile(wasmCode);
-  const instance = await WebAssembly.instantiate(module);
-  
-  wasmModule = {
-    compare: (a: Uint8Array, b: Uint8Array): boolean => {
-      if (a.length !== b.length) return false;
-      
-      const memory = new Uint8Array((instance.exports.memory as WebAssembly.Memory).buffer);
-      const aOffset = 0;
-      const bOffset = a.length;
-      
-      memory.set(a, aOffset);
-      memory.set(b, bOffset);
-      
-      const result = (instance.exports.compare as (
-        aOffset: number,
-        bOffset: number,
-        length: number
-      ) => number)(
-        aOffset, bOffset, a.length
-      );
-      
-      // Clear memory
-      memory.fill(0, aOffset, aOffset + a.length);
-      memory.fill(0, bOffset, bOffset + b.length);
-      
-      return Boolean(result);
+  try {
+    const module = await WebAssembly.compile(wasmCode);
+    const instance = await WebAssembly.instantiate(module);
+    
+    // Verify the exports exist
+    if (!instance.exports.memory || !instance.exports.compare) {
+      throw new Error('WASM module missing required exports');
     }
-  };
+    
+    wasmModule = {
+      compare: (a: Uint8Array, b: Uint8Array): boolean => {
+        if (a.length !== b.length) return false;
+        
+        // Get memory with proper type assertion
+        const memory = new Uint8Array((instance.exports.memory as WebAssembly.Memory).buffer);
+        const aOffset = 0;
+        const bOffset = a.length;
+        
+        // Check that we have enough memory
+        if (memory.length < aOffset + a.length + b.length) {
+          throw new Error('Insufficient WASM memory for comparison');
+        }
+        
+        // Copy data into WASM memory
+        memory.set(a, aOffset);
+        memory.set(b, bOffset);
+        
+        // Perform constant-time comparison
+        try {
+          const result = (instance.exports.compare as (
+            aOffset: number,
+            bOffset: number,
+            length: number
+          ) => number)(
+            aOffset, bOffset, a.length
+          );
+          
+          return Boolean(result);
+        } finally {
+          // Always clear memory regardless of result
+          memory.fill(0, aOffset, aOffset + a.length);
+          memory.fill(0, bOffset, bOffset + b.length);
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Failed to initialize WASM module:', error);
+    throw new Error(`WASM initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
+// Perform constant-time comparison with proper error handling
 export const compare = async (a: Uint8Array, b: Uint8Array): Promise<boolean> => {
-  if (!wasmModule) {
-    await initWasm();
+  try {
+    if (!wasmModule) {
+      await initWasm();
+    }
+    
+    if (!wasmModule) {
+      throw new Error('WASM module failed to initialize');
+    }
+    
+    return wasmModule.compare(a, b);
+  } catch (error) {
+    console.error('Constant-time comparison failed:', error);
+    throw new Error(`Comparison failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  return wasmModule!.compare(a, b);
 };
