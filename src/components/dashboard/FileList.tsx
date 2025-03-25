@@ -6,10 +6,8 @@ import FileCard from './FileCard';
 
 interface FileListProps {
   files: FileItemAdapter[];
-  searchQuery?: string;
   activeTab?: string;
   setActiveTab?: React.Dispatch<React.SetStateAction<string>>;
-  handleFileUpload?: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   downloadFile?: (fileId: string) => Promise<void>;
   deleteFile?: (fileId: string) => void;
   onDeleteComplete?: () => void;
@@ -19,10 +17,8 @@ interface FileListProps {
 
 const FileList: React.FC<FileListProps> = ({
   files,
-  searchQuery,
   activeTab = 'all',
   setActiveTab,
-  handleFileUpload,
   downloadFile,
   deleteFile,
   onDeleteComplete,

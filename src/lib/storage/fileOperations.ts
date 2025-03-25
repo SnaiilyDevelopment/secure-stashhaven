@@ -30,7 +30,7 @@ export const uploadEncryptedFile = async (
 
     // Encrypt the file
     const filePath = path || `${Date.now()}_${file.name}`;
-    const encryptedBlob = await encryptFile(file, encryptionKey, filePath);
+    const encryptedBlob = await encryptFile(file, encryptionKey);
     onProgress?.(40); // Encryption complete
     
     // Upload encrypted file
@@ -126,7 +126,7 @@ export const downloadEncryptedFile = async (
     }
     
     // Decrypt the file
-    const decryptedBlob = await decryptFile(data, encryptionKey, originalType, fileName);
+    const decryptedBlob = await decryptFile(data, encryptionKey, originalType);
     
     return decryptedBlob;
   } catch (error) {

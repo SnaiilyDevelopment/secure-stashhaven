@@ -1,5 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { FileRecipient, isValidPermission } from "./types";
+import { FileRecipient } from "./types";
+import { isValidPermission } from "./types";
 
 /**
  * Get all users who have access to a file
@@ -58,7 +60,7 @@ export const removeFileAccess = async (shareId: string): Promise<boolean> => {
     }
     
     // Use RPC function to remove access
-    const { data, error } = await supabase
+    const { error } = await supabase
       .rpc('remove_file_access', { 
         share_id_param: shareId, 
         owner_id_param: user.id 
@@ -80,7 +82,7 @@ export const removeFileAccess = async (shareId: string): Promise<boolean> => {
 export async function removeRecipient(fileId: string, email: string): Promise<boolean> {
   try {
     const { error } = await supabase
-      .from('file_sharing')
+      .from('file_shares')  // Changed from 'file_sharing' to 'file_shares'
       .delete()
       .eq('file_id', fileId)
       .eq('recipient_email', email);

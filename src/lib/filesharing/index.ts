@@ -3,4 +3,5 @@
 export { shareFileWithUser, ShareFileError } from './share';
 export { getFileRecipients, removeFileAccess } from './recipients';
 export { getFilesSharedWithMe } from './shared-files';
-export type { FileRecipient, SharedFile } from './types';
+export type { FileRecipient, SharedFile, PermissionType } from './types';
+export { isValidPermission } from './types';

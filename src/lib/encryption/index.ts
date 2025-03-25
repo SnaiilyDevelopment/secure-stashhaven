@@ -19,10 +19,10 @@ export {
 export { 
   encryptText,
   decryptText,
-  encryptTextSecure,
-  decryptTextSecure,
   TextEncryptionError,
-  TextDecryptionError
+  TextDecryptionError,
+  encryptTextSecure,
+  decryptTextSecure
 } from './textEncryption';
 
 // Export file encryption

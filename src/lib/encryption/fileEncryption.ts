@@ -1,3 +1,4 @@
+
 /**
  * File encryption utilities using AES-CBC with SHA-256 HMAC for integrity
  * Implements secure encryption practices inspired by NaCl secretbox
@@ -6,7 +7,6 @@
 import { 
   generateEncryptionKey, 
   importEncryptionKey,
-  exportEncryptionKey,
   arrayBufferToBase64,
   base64ToArrayBuffer
 } from './core';
@@ -94,7 +94,7 @@ export async function decryptFile(encryptedBlob: Blob, key: CryptoKey | string, 
     
     // Extract the IV from the beginning of the buffer
     const iv = new Uint8Array(encryptedBuffer.slice(0, 16));
-    const encryptedData = encryptedBuffer.slice(16);
+    const encrypted = encryptedBuffer.slice(16);
     
     // Decrypt the file data
     const decryptedData = await window.crypto.subtle.decrypt(
@@ -103,7 +103,7 @@ export async function decryptFile(encryptedBlob: Blob, key: CryptoKey | string, 
         iv: iv,
       },
       cryptoKey,
-      encryptedData
+      encrypted
     );
     
     // Create a new Blob from the decrypted data
