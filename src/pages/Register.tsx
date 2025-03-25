@@ -3,22 +3,31 @@ import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LockKeyhole } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { isAuthenticated } from '@/lib/auth';
 import ThreeDBackground from '@/components/3DBackground';
 import RegisterForm from '@/components/auth/RegisterForm';
+import { useAuth } from '@/hooks/useAuth';
 
 const Register = () => {
   const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const authenticated = await isAuthenticated();
-      if (authenticated) {
-        navigate('/dashboard');
-      }
-    };
-    checkAuth();
-  }, [navigate]);
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
+  // Show a simple loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-green-50">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-green-600 border-t-transparent animate-spin mx-auto mb-4"></div>
+          <p className="text-green-800">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">

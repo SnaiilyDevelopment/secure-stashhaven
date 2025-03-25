@@ -17,29 +17,35 @@
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Error handling for global errors -->
+    <!-- Error handling for global errors with improved CORS and SRI handling -->
     <script>
       window.addEventListener('error', function(event) {
         console.error('Global error caught:', event.error);
         
-        // Check if this is a SecurityError with Cloudflare Insights
-        if (event.error && event.error.name === 'SecurityError' && 
-            event.error.message && event.error.message.includes('insecure')) {
-          console.log('Suppressing SecurityError related to Cloudflare Insights');
+        // Check if this is a SecurityError with Cloudflare Insights or SRI failure
+        if (event.error && 
+            ((event.error.name === 'SecurityError' && event.error.message && event.error.message.includes('insecure')) ||
+             (event.message && event.message.includes('integrity')))) {
+          console.log('Suppressing SecurityError or SRI error related to external resources');
           // Prevent the error from bubbling up
           event.preventDefault();
         }
       });
       
-      // Handle unhandled promise rejections
+      // Handle unhandled promise rejections with improved filtering
       window.addEventListener('unhandledrejection', function(event) {
         console.error('Unhandled promise rejection:', event.reason);
         
-        // Check if this is related to CORS or SecurityError
+        // Check if this is related to CORS, SecurityError, or SRI
         if (event.reason && 
             (event.reason.name === 'SecurityError' || 
-             (event.reason.message && event.reason.message.includes('CORS')))) {
-          console.log('Suppressing CORS or security-related promise rejection');
+             (event.reason.message && (
+               event.reason.message.includes('CORS') ||
+               event.reason.message.includes('integrity') ||
+               event.reason.message.includes('cross-origin')
+             ))
+            )) {
+          console.log('Suppressing CORS, SRI, or security-related promise rejection');
           event.preventDefault();
         }
       });
