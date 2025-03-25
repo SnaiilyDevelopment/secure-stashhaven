@@ -85,3 +85,7 @@ export async function decryptText(encrypted: string, key: CryptoKey | string): P
     throw new TextDecryptionError('Failed to decrypt text: ' + (error.message || 'Unknown error'), error);
   }
 }
+
+// Aliases for backward compatibility
+export const encryptTextSecure = encryptText;
+export const decryptTextSecure = decryptText;

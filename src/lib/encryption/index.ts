@@ -17,8 +17,8 @@ export {
 
 // Export text encryption (using named imports to avoid conflicts with core)
 export { 
-  encryptTextSecure,
-  decryptTextSecure,
+  encryptText,
+  decryptText,
   TextEncryptionError,
   TextDecryptionError
 } from './textEncryption';

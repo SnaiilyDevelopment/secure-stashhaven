@@ -6,6 +6,12 @@ import FileCard from './FileCard';
 
 interface FileListProps {
   files: FileItemAdapter[];
+  searchQuery?: string;
+  activeTab?: string;
+  setActiveTab?: React.Dispatch<React.SetStateAction<string>>;
+  handleFileUpload?: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  downloadFile?: (fileId: string) => Promise<void>;
+  deleteFile?: (fileId: string) => void;
   onDeleteComplete?: () => void;
   isLoading?: boolean;
   emptyMessage?: string;
@@ -13,16 +19,32 @@ interface FileListProps {
 
 const FileList: React.FC<FileListProps> = ({
   files,
+  searchQuery,
+  activeTab = 'all',
+  setActiveTab,
+  handleFileUpload,
+  downloadFile,
+  deleteFile,
   onDeleteComplete,
   isLoading = false,
   emptyMessage = "No files found"
 }) => {
-  const [activeTab, setActiveTab] = useState<'all' | 'images' | 'docs' | 'other'>('all');
+  const [localActiveTab, setLocalActiveTab] = useState<'all' | 'images' | 'docs' | 'other'>('all');
+  
+  // Use either the prop or the local state for the active tab
+  const currentActiveTab = setActiveTab ? activeTab as 'all' | 'images' | 'docs' | 'other' : localActiveTab;
+  const handleTabChange = (value: string) => {
+    if (setActiveTab) {
+      setActiveTab(value);
+    } else {
+      setLocalActiveTab(value as 'all' | 'images' | 'docs' | 'other');
+    }
+  };
   
   const filteredFiles = files.filter(file => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'images' && file.type?.startsWith('image/')) return true;
-    if (activeTab === 'docs' && (
+    if (currentActiveTab === 'all') return true;
+    if (currentActiveTab === 'images' && file.type?.startsWith('image/')) return true;
+    if (currentActiveTab === 'docs' && (
       file.type?.includes('document') || 
       file.type?.includes('pdf') ||
       file.type?.includes('word') ||
@@ -30,7 +52,7 @@ const FileList: React.FC<FileListProps> = ({
       file.type?.includes('text') ||
       file.type?.includes('spreadsheet')
     )) return true;
-    if (activeTab === 'other' && 
+    if (currentActiveTab === 'other' && 
       !file.type?.startsWith('image/') && 
       !file.type?.includes('document') && 
       !file.type?.includes('pdf') &&
@@ -44,7 +66,7 @@ const FileList: React.FC<FileListProps> = ({
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as any)}>
+      <Tabs defaultValue="all" value={currentActiveTab} onValueChange={handleTabChange}>
         <TabsList className="grid grid-cols-4 mb-4">
           <TabsTrigger value="all">All Files</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
@@ -67,11 +89,14 @@ const FileList: React.FC<FileListProps> = ({
               key={file.id}
               file={file}
               onDelete={() => {
-                // Handle delete
+                if (deleteFile) {
+                  deleteFile(file.id);
+                }
                 if (onDeleteComplete) {
                   onDeleteComplete();
                 }
               }}
+              onDownload={downloadFile ? () => downloadFile(file.id) : undefined}
             />
           ))
         ) : (

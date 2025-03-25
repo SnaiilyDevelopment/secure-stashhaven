@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { FileRecipient, isValidPermission } from "./types";
 
@@ -77,3 +76,23 @@ export const removeFileAccess = async (shareId: string): Promise<boolean> => {
     return false;
   }
 };
+
+export async function removeRecipient(fileId: string, email: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('file_sharing')
+      .delete()
+      .eq('file_id', fileId)
+      .eq('recipient_email', email);
+    
+    if (error) {
+      console.error("Error removing file recipient:", error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error in removeRecipient:", error);
+    return false;
+  }
+}

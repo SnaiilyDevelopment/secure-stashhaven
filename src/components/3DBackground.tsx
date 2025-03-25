@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
@@ -185,7 +186,7 @@ const BackgroundScene: React.FC<BackgroundSceneProps> = ({
 
 const dispose = (object: THREE.Object3D): void => {
   // Recursively dispose of all children
-  object.children.forEach((child) => dispose(child));
+  object.children.forEach((child: THREE.Object3D) => dispose(child));
   
   // Dispose of geometries
   if ('geometry' in object && object.geometry) {

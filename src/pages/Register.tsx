@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LockKeyhole } from 'lucide-react';
@@ -17,7 +16,6 @@ const Register = () => {
     }
   }, [user, navigate]);
 
-  // Show a simple loading state while checking auth
   if (isLoading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-green-50">
@@ -31,7 +29,6 @@ const Register = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">
-      {/* 3D Interactive Background */}
       <ThreeDBackground color="#22c55e" />
       
       <div className="w-full max-w-md mx-auto relative z-10">

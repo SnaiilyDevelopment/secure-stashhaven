@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilePlus } from 'lucide-react';
@@ -8,7 +9,6 @@ import { isAuthenticated, getCurrentUserEncryptionKey } from '@/lib/auth';
 import { encryptFile, decryptFile } from '@/lib/encryption';
 import SearchBar from '@/components/dashboard/SearchBar';
 import FileList from '@/components/dashboard/FileList';
-import { adaptFileMetadataToFileItem } from '@/lib/types';
 
 interface FileItem {
   id: string;

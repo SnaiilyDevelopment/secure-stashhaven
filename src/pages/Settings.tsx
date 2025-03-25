@@ -1,215 +1,264 @@
-
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatBytes, getUserStorageUsage } from '@/lib/storage';
+import { Settings as SettingsIcon, Bell, Eye, Shield } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import MainLayout from '@/components/layout/MainLayout';
+import CardWrapper from '@/components/layout/CardWrapper';
+import { toast } from '@/components/ui/use-toast';
 
-const Settings = () => {
-  const [storageInfo, setStorageInfo] = useState({ totalSize: 0, fileCount: 0 });
-  const [isAutoLockEnabled, setIsAutoLockEnabled] = useState(true);
-  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
-  const [isDarkModeEnabled, setIsDarkModeEnabled] = useState(false);
-  const [isActiveSessionsExpanded, setIsActiveSessionsExpanded] = useState(false);
-  
-  const handleClearCache = async () => {
-    // Placeholder for clear cache functionality
-    alert("Cache cleared");
-  };
-  
-  const handleRefreshStorageUsage = async () => {
-    try {
-      // Get usage information
-      const totalSize = await getUserStorageUsage();
-      const estimatedFileCount = Math.ceil(totalSize / (2 * 1024 * 1024));
-      
-      setStorageInfo({
-        totalSize: totalSize,
-        fileCount: estimatedFileCount
-      });
-      
-      alert("Storage usage refreshed");
-    } catch (error) {
-      console.error("Failed to refresh storage usage", error);
-      alert("Failed to refresh storage usage");
+interface Settings {
+  darkMode: boolean;
+  animations: boolean;
+}
+
+interface NotificationSettings {
+  emailNotifications: boolean;
+  fileSharingNotifications: boolean;
+}
+
+interface PrivacySettings {
+  allowAnalytics: boolean;
+  sendCrashReports: boolean;
+}
+
+interface SecuritySettings {
+  autoLogout: boolean;
+}
+
+const SettingsPage = () => {
+  const [generalSettings, setGeneralSettings] = useState<Settings>({
+    darkMode: false,
+    animations: true,
+  });
+
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    emailNotifications: true,
+    fileSharingNotifications: true,
+  });
+
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>({
+    allowAnalytics: true,
+    sendCrashReports: true,
+  });
+
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
+    autoLogout: false,
+  });
+
+  const updateSettings = (type: string, newSettings: any) => {
+    switch (type) {
+      case 'general':
+        setGeneralSettings(prev => ({ ...prev, ...newSettings }));
+        break;
+      case 'notifications':
+        setNotificationSettings(prev => ({ ...prev, ...newSettings }));
+        break;
+      case 'privacy':
+        setPrivacySettings(prev => ({ ...prev, ...newSettings }));
+        break;
+      case 'security':
+        setSecuritySettings(prev => ({ ...prev, ...newSettings }));
+        break;
+      default:
+        console.warn('Unknown settings type');
     }
+
+    toast({
+      title: "Settings updated",
+      description: "Your settings have been successfully updated.",
+    });
   };
-  
+
+  const resetAllSettings = () => {
+    setGeneralSettings({ darkMode: false, animations: true });
+    setNotificationSettings({ emailNotifications: true, fileSharingNotifications: true });
+    setPrivacySettings({ allowAnalytics: true, sendCrashReports: true });
+    setSecuritySettings({ autoLogout: false });
+
+    toast({
+      title: "Settings reset",
+      description: "All settings have been reset to their default values.",
+    });
+  };
+
   return (
     <MainLayout>
-      <div className="container py-8">
-        <h1 className="text-3xl font-bold mb-6">Settings</h1>
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-6">Settings</h1>
         
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="storage">Storage</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
-          </TabsList>
+        <CardWrapper>
+          <div className="flex items-start">
+            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mr-4">
+              <SettingsIcon className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-medium">General</h2>
+              <p className="text-muted-foreground mt-1">General application settings</p>
+            </div>
+          </div>
           
-          <TabsContent value="general" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <CardDescription>Customize how the app looks</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="dark-mode">Dark Mode</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Enable dark mode for a low-light interface
-                    </p>
-                  </div>
-                  <Switch 
-                    id="dark-mode" 
-                    checked={isDarkModeEnabled}
-                    onCheckedChange={setIsDarkModeEnabled}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          <div className="space-y-6 mt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="dark-mode">Dark mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable dark mode for the application
+                </p>
+              </div>
+              <Switch 
+                id="dark-mode" 
+                checked={generalSettings.darkMode} 
+                onCheckedChange={(checked) => updateSettings('general', { darkMode: checked })}
+              />
+            </div>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications</CardTitle>
-                <CardDescription>Configure how you receive notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="notifications">Enable Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive alerts about security events and file sharing
-                    </p>
-                  </div>
-                  <Switch 
-                    id="notifications" 
-                    checked={isNotificationsEnabled}
-                    onCheckedChange={setIsNotificationsEnabled}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="security" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Session Security</CardTitle>
-                <CardDescription>Control how your session is managed</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="auto-lock">Auto-Lock</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically lock your vault after 15 minutes of inactivity
-                    </p>
-                  </div>
-                  <Switch 
-                    id="auto-lock" 
-                    checked={isAutoLockEnabled}
-                    onCheckedChange={setIsAutoLockEnabled}
-                  />
-                </div>
-                
-                <div>
-                  <button
-                    className="text-primary hover:underline text-sm font-medium"
-                    onClick={() => setIsActiveSessionsExpanded(!isActiveSessionsExpanded)}
-                  >
-                    {isActiveSessionsExpanded ? "Hide" : "View"} Active Sessions
-                  </button>
-                  
-                  {isActiveSessionsExpanded && (
-                    <div className="mt-2 border rounded-md p-3 text-sm">
-                      <div className="flex justify-between">
-                        <div>
-                          <div className="font-medium">Current Session</div>
-                          <div className="text-muted-foreground">Chrome on Windows</div>
-                        </div>
-                        <div className="text-green-500">Active Now</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <Separator />
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Two-Factor Authentication</CardTitle>
-                <CardDescription>Add an extra layer of security</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm">
-                  Enable Two-Factor Authentication
-                </button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="animations">Animations</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable UI animations
+                </p>
+              </div>
+              <Switch 
+                id="animations" 
+                checked={generalSettings.animations} 
+                onCheckedChange={(checked) => updateSettings('general', { animations: checked })}
+              />
+            </div>
+          </div>
+        </CardWrapper>
+        
+        <CardWrapper>
+          <div className="flex items-start">
+            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mr-4">
+              <Bell className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-medium">Notifications</h2>
+              <p className="text-muted-foreground mt-1">Manage notification preferences</p>
+            </div>
+          </div>
           
-          <TabsContent value="storage" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Storage Management</CardTitle>
-                <CardDescription>Manage your encrypted storage</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span>Total Storage Used:</span>
-                  <span className="font-medium">{formatBytes(storageInfo.totalSize)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Files Stored:</span>
-                  <span className="font-medium">{storageInfo.fileCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Storage Limit:</span>
-                  <span className="font-medium">2 GB (Free Plan)</span>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm"
-                    onClick={handleRefreshStorageUsage}
-                  >
-                    Refresh Usage
-                  </button>
-                  <button 
-                    className="bg-muted text-muted-foreground px-4 py-2 rounded-md text-sm"
-                    onClick={handleClearCache}
-                  >
-                    Clear Cache
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <div className="space-y-6 mt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="email-notifications">Email notifications</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive email notifications about your account
+                </p>
+              </div>
+              <Switch 
+                id="email-notifications" 
+                checked={notificationSettings.emailNotifications} 
+                onCheckedChange={(checked) => updateSettings('notifications', { emailNotifications: checked })}
+              />
+            </div>
+            
+            <Separator />
+            
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="file-sharing-notifications">File sharing notifications</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive notifications when files are shared with you
+                </p>
+              </div>
+              <Switch 
+                id="file-sharing-notifications" 
+                checked={notificationSettings.fileSharingNotifications} 
+                onCheckedChange={(checked) => updateSettings('notifications', { fileSharingNotifications: checked })}
+              />
+            </div>
+          </div>
+        </CardWrapper>
+        
+        <CardWrapper>
+          <div className="flex items-start">
+            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mr-4">
+              <Eye className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-medium">Privacy</h2>
+              <p className="text-muted-foreground mt-1">Manage your privacy settings</p>
+            </div>
+          </div>
           
-          <TabsContent value="account" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Management</CardTitle>
-                <CardDescription>Manage your account settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm">
-                  Change Password
-                </button>
-                <button className="bg-destructive text-destructive-foreground px-4 py-2 rounded-md text-sm">
-                  Delete Account
-                </button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          <div className="space-y-6 mt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="analytics">Allow analytics</Label>
+                <p className="text-sm text-muted-foreground">
+                  Help us improve by allowing anonymous usage data collection
+                </p>
+              </div>
+              <Switch 
+                id="analytics" 
+                checked={privacySettings.allowAnalytics} 
+                onCheckedChange={(checked) => updateSettings('privacy', { allowAnalytics: checked })}
+              />
+            </div>
+            
+            <Separator />
+            
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="crash-reports">Send crash reports</Label>
+                <p className="text-sm text-muted-foreground">
+                  Automatically send crash reports to help fix issues
+                </p>
+              </div>
+              <Switch 
+                id="crash-reports" 
+                checked={privacySettings.sendCrashReports} 
+                onCheckedChange={(checked) => updateSettings('privacy', { sendCrashReports: checked })}
+              />
+            </div>
+          </div>
+        </CardWrapper>
+        
+        <CardWrapper>
+          <div className="flex justify-between items-center">
+            <div className="flex items-start">
+              <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mr-4">
+                <Shield className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-medium">Security</h2>
+                <p className="text-muted-foreground mt-1">Secure your account</p>
+              </div>
+            </div>
+            
+            <Button 
+              variant="destructive" 
+              onClick={resetAllSettings}
+            >
+              Reset All Settings
+            </Button>
+          </div>
+          
+          <div className="space-y-6 mt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="auto-logout">Auto logout</Label>
+                <p className="text-sm text-muted-foreground">
+                  Automatically log out after 30 minutes of inactivity
+                </p>
+              </div>
+              <Switch 
+                id="auto-logout" 
+                checked={securitySettings.autoLogout} 
+                onCheckedChange={(checked) => updateSettings('security', { autoLogout: checked })}
+              />
+            </div>
+          </div>
+        </CardWrapper>
       </div>
     </MainLayout>
   );
 };
 
-export default Settings;
+export default SettingsPage;
