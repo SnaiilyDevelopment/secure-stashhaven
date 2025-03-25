@@ -1,241 +1,265 @@
 
 /**
- * File encryption utilities for end-to-end encryption
+ * File encryption utilities 
+ * Secure file encryption for sensitive data with integrity protection
  */
 
-import { importEncryptionKey, arrayBufferToBase64 } from './core';
-import { toast } from '@/components/ui/use-toast';
-import crypto from 'crypto';
+import { toast } from "@/components/ui/use-toast";
+import { IVReuseAlert } from '@/components/encryption/IVReuseAlert';
+import { importEncryptionKey, arrayBufferToBase64, base64ToArrayBuffer, zeroBuffer } from './core';
 
-// IV tracking for reuse protection
-interface IVMetadata {
-  iv: string;
-  timestamp: number;
-  useCount: number;
-}
+// Track used IVs to prevent reuse (security risk)
+const usedIVs = new Set<string>();
 
-// Stats interface for IVReuseAlert component
-export interface IVUsageStats {
-  count: number;
-  maxCount: number;
-  oldestTimestamp: number | null;
-  removalPeriod: number;
-}
-
-// Maximum number of IVs to track (default: 1000)
-const DEFAULT_MAX_IV_COUNT = 1000;
-
-// Period after which IVs are removed from tracking (default: 24 hours in milliseconds)
-const DEFAULT_IV_REMOVAL_PERIOD = 24 * 60 * 60 * 1000;
-
-// Store used IVs with timestamps and counts
-let usedIVs: IVMetadata[] = [];
-
-// Clean up old IVs
-const cleanupOldIVs = (maxIVCount: number = DEFAULT_MAX_IV_COUNT, removalPeriod: number = DEFAULT_IV_REMOVAL_PERIOD) => {
-  const now = Date.now();
-  
-  // Remove IVs older than removalPeriod
-  usedIVs = usedIVs.filter(ivData => (now - ivData.timestamp) < removalPeriod);
-  
-  // If we still have too many IVs, remove the oldest ones
-  if (usedIVs.length > maxIVCount) {
-    // Sort by timestamp (oldest first) and remove excess
-    usedIVs.sort((a, b) => a.timestamp - b.timestamp);
-    usedIVs = usedIVs.slice(usedIVs.length - maxIVCount);
-    
-    // Show a warning that we're removing IVs
-    toast({
-      title: "Security Notice",
-      description: "Some encryption IVs were rotated due to maximum count reached.",
-      variant: "default"
-    });
-  }
-};
-
-// Provide IV usage statistics for the IVReuseAlert component
-export const getIVUsageStats = (): IVUsageStats => {
-  const timestamps = usedIVs.map(iv => iv.timestamp);
-  const oldestTimestamp = timestamps.length > 0 ? Math.min(...timestamps) : null;
-  
-  return {
-    count: usedIVs.length,
-    maxCount: DEFAULT_MAX_IV_COUNT,
-    oldestTimestamp,
-    removalPeriod: DEFAULT_IV_REMOVAL_PERIOD
-  };
-};
-
-// Check if an IV has been used before and track it
-const trackIV = (iv: Uint8Array, maxIVCount: number = DEFAULT_MAX_IV_COUNT, removalPeriod: number = DEFAULT_IV_REMOVAL_PERIOD): boolean => {
-  const ivBase64 = arrayBufferToBase64(iv.buffer);
-  const now = Date.now();
-  
-  // Clean up old IVs first
-  cleanupOldIVs(maxIVCount, removalPeriod);
-  
-  // Check if this IV has been used before
-  const existingIV = usedIVs.find(ivData => ivData.iv === ivBase64);
-  
-  if (existingIV) {
-    // Increment use count for this IV
-    existingIV.useCount++;
-    existingIV.timestamp = now; // Update timestamp to keep it fresh
-    
-    // Show a security alert when an IV is reused
-    toast({
-      title: "Security Warning",
-      description: "Encryption IV reuse detected. This may reduce security.",
-      variant: "destructive"
-    });
-    
-    return true; // IV has been used before
-  }
-  
-  // Track this new IV
-  usedIVs.push({
-    iv: ivBase64,
-    timestamp: now,
-    useCount: 1
-  });
-  
-  return false; // IV has not been used before
-};
-
-// Define custom error types for encryption operations
+// Error classes
 export class EncryptionError extends Error {
-  constructor(message: string, public errorType: string = 'ENCRYPTION_ERROR', public details?: any) {
+  constructor(message: string, public cause?: Error) {
     super(message);
     this.name = 'EncryptionError';
   }
 }
 
 export class IVReuseError extends EncryptionError {
-  constructor(message: string, details?: any) {
-    super(message, 'IV_REUSE_ERROR', details);
+  constructor(message: string, public filePath: string) {
+    super(message);
     this.name = 'IVReuseError';
   }
 }
 
-// Encrypt a file with the user's encryption key
-export const encryptFile = async (
-  file: File, 
-  encryptionKey: string, 
-  options?: { 
-    maxIVCount?: number, 
-    removalPeriod?: number,
-    fallbackDisabled?: boolean
-  }
-): Promise<Blob> => {
-  const { maxIVCount = DEFAULT_MAX_IV_COUNT, removalPeriod = DEFAULT_IV_REMOVAL_PERIOD, fallbackDisabled = false } = options || {};
+// Generate a secure, random 96-bit IV for AES-GCM
+const generateIV = (): Uint8Array => {
+  const iv = new Uint8Array(12); // 96 bits
+  window.crypto.getRandomValues(iv);
+  return iv;
+};
+
+// Check if an IV has been used before
+const checkIVUniqueness = (iv: Uint8Array, filePath: string): boolean => {
+  const ivString = arrayBufferToBase64(iv.buffer);
   
-  try {
-    const key = await importEncryptionKey(encryptionKey);
-    const fileArrayBuffer = await file.arrayBuffer();
-    
-    // Generate a random IV for this encryption
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    
-    // Track this IV to prevent reuse
-    const isReused = trackIV(iv, maxIVCount, removalPeriod);
-    
-    // If this IV has been used before and fallback is disabled, fail the operation
-    if (isReused && fallbackDisabled) {
-      throw new IVReuseError("Encryption canceled due to IV reuse. This is a security measure.");
-    }
-    
-    // Add additional authentication data for enhanced security
-    const additionalData = new TextEncoder().encode(`file:${file.name}:${file.type}`);
-    
-    // Encrypt the file
-    const encryptedContent = await window.crypto.subtle.encrypt(
-      { 
-        name: 'AES-GCM', 
-        iv,
-        additionalData // Properly encoded as BufferSource
-      },
-      key,
-      fileArrayBuffer
+  if (usedIVs.has(ivString)) {
+    console.warn(`IV reuse detected for file: ${filePath}`);
+    // This is a serious security issue - must alert user
+    throw new IVReuseError(
+      `IV reuse detected for file: ${filePath}. This is a security risk.`,
+      filePath
     );
-    
-    // Combine IV and encrypted content
-    const encryptedBlob = new Blob([
-      iv.buffer,
-      encryptedContent
-    ], { type: 'application/encrypted' });
-    
-    return encryptedBlob;
-  } catch (error) {
-    console.error("File encryption error:", error);
-    
-    // Handle different types of errors appropriately
-    if (error instanceof IVReuseError) {
-      toast({
-        title: "Encryption Failed",
-        description: error.message,
-        variant: "destructive"
-      });
-      throw error;
-    }
-    
-    // Generic encryption error
-    const errorMessage = error instanceof Error ? error.message : "Unknown encryption error";
-    toast({
-      title: "Encryption Failed",
-      description: errorMessage,
-      variant: "destructive"
-    });
-    
-    throw new EncryptionError("Failed to encrypt file", "ENCRYPTION_FAILED", error);
+  }
+  
+  // Add IV to used set
+  usedIVs.add(ivString);
+  return true;
+};
+
+// Convert file to ArrayBuffer
+const fileToArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+// Calculate hash of file for integrity verification
+const calculateFileHash = async (buffer: ArrayBuffer): Promise<string> => {
+  try {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    return arrayBufferToBase64(hashBuffer);
+  } catch (error: any) {
+    console.error("Hash calculation error:", error);
+    throw new EncryptionError("Failed to calculate file hash", error);
   }
 };
 
-// Decrypt a file with the user's encryption key
-export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, originalType: string, fileName: string = ''): Promise<Blob> => {
+// Encrypt a file with AES-GCM
+export const encryptFile = async (
+  file: File,
+  key: CryptoKey | string,
+  filePath: string
+): Promise<{ 
+  encrypted: Blob, 
+  iv: string, 
+  originalName: string, 
+  originalType: string 
+}> => {
   try {
-    const key = await importEncryptionKey(encryptionKey);
-    const encryptedData = await encryptedBlob.arrayBuffer();
+    console.log(`Beginning encryption for file: ${file.name}`);
     
-    // Extract IV (first 12 bytes)
-    const iv = new Uint8Array(encryptedData.slice(0, 12));
+    // Convert string key to CryptoKey if necessary
+    const cryptoKey = typeof key === 'string' 
+      ? await importEncryptionKey(key) 
+      : key;
     
-    // Extract encrypted content (everything after IV)
-    const encryptedContent = encryptedData.slice(12);
+    // Generate a unique IV
+    const iv = generateIV();
     
-    // Fix: Only create additionalData if fileName is provided
-    const additionalData = fileName ? new TextEncoder().encode(`file:${fileName}:${originalType}`) : undefined;
-    
+    // Ensure IV hasn't been used before (prevents critical security issues)
     try {
-      // Decrypt the file
-      const decryptedContent = await window.crypto.subtle.decrypt(
-        { 
-          name: 'AES-GCM', 
-          iv,
-          ...(additionalData ? { additionalData } : {})
-        },
-        key,
-        encryptedContent
-      );
-      
-      // Return as blob with original type
-      return new Blob([decryptedContent], { type: originalType || 'application/octet-stream' });
+      checkIVUniqueness(iv, filePath);
     } catch (error) {
-      console.error('Decryption failed:', error);
-      
-      // Show more detailed error message
-      toast({
-        title: "Decryption Failed",
-        description: "Unable to decrypt file. The encryption key may be incorrect or the file may be corrupted.",
-        variant: "destructive"
-      });
-      
-      throw new EncryptionError("Failed to decrypt file", "DECRYPTION_FAILED", error);
+      if (error instanceof IVReuseError) {
+        // Show warning but allow operation to continue with new IV
+        console.warn("IV reuse detected, generating new IV");
+        
+        // Notify user with toast
+        toast({
+          title: "Security notice",
+          description: "Enhancing security for file upload",
+          variant: "default"
+        });
+        
+        // Generate a new IV and continue
+        const newIV = generateIV();
+        return await encryptFile(file, cryptoKey, filePath);
+      } else {
+        throw error;
+      }
     }
-  } catch (error) {
-    console.error('Decryption process error:', error);
     
-    // Rethrow with better error details
-    const errorMessage = error instanceof Error ? error.message : "Unknown decryption error";
-    throw new EncryptionError(errorMessage, "DECRYPTION_PROCESS_FAILED", error);
+    // Read file as array buffer
+    const fileData = await fileToArrayBuffer(file);
+    
+    // Add metadata to the beginning of the file
+    const fileInfo = {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified
+    };
+    
+    const infoJson = JSON.stringify(fileInfo);
+    const infoBytes = new TextEncoder().encode(infoJson);
+    
+    // Length prefix (4 bytes) + metadata + file data
+    const infoLength = new Uint32Array([infoBytes.length]);
+    const combinedData = new Uint8Array(
+      4 + infoBytes.length + fileData.byteLength
+    );
+    
+    // Assemble combined data
+    combinedData.set(new Uint8Array(infoLength.buffer), 0);
+    combinedData.set(infoBytes, 4);
+    combinedData.set(new Uint8Array(fileData), 4 + infoBytes.length);
+    
+    // Encrypt the combined data
+    const encrypted = await window.crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv,
+        tagLength: 128 // Authentication tag size in bits
+      },
+      cryptoKey,
+      combinedData
+    );
+    
+    // Format for storage: IV (12 bytes) + Encrypted data
+    const result = new Uint8Array(iv.length + encrypted.byteLength);
+    result.set(iv, 0);
+    result.set(new Uint8Array(encrypted), iv.length);
+    
+    // Convert to Blob for storage
+    const encryptedBlob = new Blob([result], { type: 'application/octet-stream' });
+    
+    console.log(`Encryption complete for file: ${file.name}`);
+    return {
+      encrypted: encryptedBlob,
+      iv: arrayBufferToBase64(iv.buffer),
+      originalName: file.name,
+      originalType: file.type
+    };
+  } catch (error: any) {
+    console.error("File encryption error:", error);
+    throw new EncryptionError(
+      `Failed to encrypt file: ${error.message || 'Unknown error'}`, 
+      error
+    );
+  }
+};
+
+// Decrypt a file with AES-GCM
+export const decryptFile = async (
+  encryptedData: ArrayBuffer,
+  key: CryptoKey | string,
+  onIVReuseDetected?: (filePath: string) => void,
+  filePath?: string
+): Promise<{ 
+  decrypted: Blob, 
+  fileName: string, 
+  fileType: string 
+}> => {
+  try {
+    console.log("Beginning file decryption");
+    
+    // Convert string key to CryptoKey if necessary
+    const cryptoKey = typeof key === 'string' 
+      ? await importEncryptionKey(key) 
+      : key;
+    
+    // Extract IV from the beginning of the encrypted data
+    const dataArray = new Uint8Array(encryptedData);
+    const iv = dataArray.slice(0, 12);
+    const ciphertext = dataArray.slice(12);
+    
+    // Record IV to detect future reuse
+    const ivString = arrayBufferToBase64(iv.buffer);
+    
+    // Check if IV has been used before (excluding current decryption)
+    if (usedIVs.has(ivString) && filePath) {
+      console.warn(`IV reuse detected during decryption for: ${filePath}`);
+      if (onIVReuseDetected) {
+        onIVReuseDetected(filePath);
+      }
+    } else if (filePath) {
+      // Add to used IVs set
+      usedIVs.add(ivString);
+    }
+    
+    // Decrypt the data
+    const decrypted = await window.crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv,
+        tagLength: 128 // Must match encryption
+      },
+      cryptoKey,
+      ciphertext
+    );
+    
+    // Extract metadata and file content
+    const decryptedArray = new Uint8Array(decrypted);
+    
+    // Read metadata length (first 4 bytes)
+    const metadataLengthArray = decryptedArray.slice(0, 4);
+    const metadataLength = new Uint32Array(metadataLengthArray.buffer)[0];
+    
+    // Extract metadata JSON
+    const metadataBytes = decryptedArray.slice(4, 4 + metadataLength);
+    const metadataJson = new TextDecoder().decode(metadataBytes);
+    const metadata = JSON.parse(metadataJson);
+    
+    // Extract file data
+    const fileData = decryptedArray.slice(4 + metadataLength);
+    
+    // Create blob with original file type
+    const decryptedBlob = new Blob([fileData], { type: metadata.type });
+    
+    console.log(`Decryption complete, file: ${metadata.name}`);
+    return {
+      decrypted: decryptedBlob,
+      fileName: metadata.name,
+      fileType: metadata.type
+    };
+  } catch (error: any) {
+    console.error("File decryption error:", error);
+    
+    // Provide user-friendly error messages
+    let errorMessage = "Failed to decrypt file";
+    
+    if (error.name === 'OperationError') {
+      errorMessage = "Invalid encryption key or corrupted file";
+    }
+    
+    throw new EncryptionError(errorMessage, error);
   }
 };

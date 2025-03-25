@@ -1,7 +1,13 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+/**
+ * File management operations for Supabase Storage
+ */
 
+import { supabase } from '@/integrations/supabase/client';
+import { getCurrentUserEncryptionKey } from '@/lib/auth';
+import { ensureStorageBucket } from './storageUtils';
+
+// File metadata type
 export interface FileMetadata {
   id: string;
   file_path: string;
@@ -11,59 +17,58 @@ export interface FileMetadata {
   encrypted: boolean;
   created_at: string;
   updated_at: string;
+  user_id: string;
 }
 
-// List all files for the current user
-export const listUserFiles = async (
-  bucketName: string = 'secure-files'
-): Promise<FileMetadata[]> => {
+// List user's files
+export const listUserFiles = async (): Promise<FileMetadata[]> => {
   try {
+    // Ensure the user is authenticated
+    const encryptionKey = getCurrentUserEncryptionKey();
+    if (!encryptionKey) {
+      console.error("No encryption key found - user not authenticated");
+      return [];
+    }
+    
+    // Query file metadata from database
     const { data, error } = await supabase
       .from('file_metadata')
       .select('*')
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error("File listing error:", error);
-      toast({
-        title: "Failed to load files",
-        description: error.message,
-        variant: "destructive"
-      });
-      return [];
+      console.error("Error fetching files:", error);
+      throw error;
     }
     
     return data || [];
   } catch (error) {
-    console.error("File listing error:", error);
-    toast({
-      title: "Failed to load files",
-      description: "An unexpected error occurred while loading files.",
-      variant: "destructive"
-    });
+    console.error("Error in listUserFiles:", error);
     return [];
   }
 };
 
-// Get metadata for a single file
-export const getFileMetadata = async (
-  filePath: string
-): Promise<FileMetadata | null> => {
+// Get metadata for a specific file
+export const getFileMetadata = async (filePath: string): Promise<FileMetadata | null> => {
   try {
+    // Query specific file metadata
     const { data, error } = await supabase
       .from('file_metadata')
       .select('*')
       .eq('file_path', filePath)
-      .maybeSingle();
+      .single();
     
     if (error) {
-      console.error("File metadata fetch error:", error);
-      return null;
+      if (error.code === 'PGRST116') { // no rows returned
+        return null;
+      }
+      console.error("Error fetching file metadata:", error);
+      throw error;
     }
     
     return data;
   } catch (error) {
-    console.error("File metadata fetch error:", error);
+    console.error("Error in getFileMetadata:", error);
     return null;
   }
 };

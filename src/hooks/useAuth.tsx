@@ -2,7 +2,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { isAuthenticated, AuthError, AuthStatus, handleAuthError } from '@/lib/auth';
+import { isAuthenticated, AuthError, handleAuthError } from '@/lib/auth';
 import { toast } from '@/components/ui/use-toast';
 
 interface AuthContextType {

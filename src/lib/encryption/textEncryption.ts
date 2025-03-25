@@ -4,7 +4,7 @@
  * Uses AES-GCM with secure key management
  */
 
-import { importEncryptionKey, exportEncryptionKey } from './core';
+import { importEncryptionKey } from './core';
 
 // Custom error classes for better error handling
 export class TextEncryptionError extends Error {

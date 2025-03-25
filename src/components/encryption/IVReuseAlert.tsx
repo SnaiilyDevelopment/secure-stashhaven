@@ -1,53 +1,56 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Shield } from 'lucide-react';
-import { getIVUsageStats } from '@/lib/encryption/fileEncryption';
-
-// Default values from fileEncryption.ts
-const DEFAULT_MAX_IV_COUNT = 1000;
-const DEFAULT_IV_REMOVAL_PERIOD = 24 * 60 * 60 * 1000;
+import { Button } from '@/components/ui/button';
 
 interface IVReuseAlertProps {
-  maxIVCount?: number;
-  removalPeriod?: number;
-  updateInterval?: number;
+  filePath: string;
+  onAcknowledge: () => void;
 }
 
+// IV Reuse Alert component
 export const IVReuseAlert: React.FC<IVReuseAlertProps> = ({ 
-  maxIVCount = DEFAULT_MAX_IV_COUNT, 
-  removalPeriod = DEFAULT_IV_REMOVAL_PERIOD,
-  updateInterval = 10000 // Update every 10 seconds by default
+  filePath, 
+  onAcknowledge 
 }) => {
-  const [usageStats, setUsageStats] = useState(() => getIVUsageStats());
-  
+  const [dismissed, setDismissed] = useState(false);
+
+  // Only show the alert for 10 minutes maximum
   useEffect(() => {
-    // Initial update
-    setUsageStats(getIVUsageStats());
+    const timeout = setTimeout(() => {
+      setDismissed(true);
+      onAcknowledge();
+    }, 10 * 60 * 1000); // 10 minutes
     
-    // Set up periodic updates
-    const intervalId = setInterval(() => {
-      setUsageStats(getIVUsageStats());
-    }, updateInterval);
-    
-    return () => clearInterval(intervalId);
-  }, [updateInterval]);
-  
-  // Only show if we have a lot of IVs tracked (>80% of max)
-  if (usageStats.count < usageStats.maxCount * 0.8) {
-    return null;
-  }
-  
+    return () => clearTimeout(timeout);
+  }, [onAcknowledge]);
+
+  if (dismissed) return null;
+
   return (
-    <Alert variant="default" className="bg-yellow-50 border-yellow-200">
-      <Shield className="h-4 w-4 text-yellow-500" />
-      <AlertTitle>Security Notice</AlertTitle>
-      <AlertDescription>
-        A large number of encryption IVs are being tracked ({usageStats.count}/{usageStats.maxCount}).
-        Some older IVs may be automatically removed for security purposes.
+    <Alert variant="destructive" className="mb-4 border-amber-500 bg-amber-50 text-amber-900">
+      <AlertTriangle className="h-5 w-5 text-amber-600" />
+      <AlertTitle className="text-amber-800">Security Warning</AlertTitle>
+      <AlertDescription className="text-amber-700">
+        <p className="mb-2">
+          A potential security issue was detected with file: <strong>{filePath.split('/').pop()}</strong>
+        </p>
+        <p className="mb-2">
+          The file was encrypted using a previously used initialization vector (IV), which could compromise security.
+          We recommend re-uploading this file to ensure proper encryption.
+        </p>
+        <Button 
+          variant="outline" 
+          className="mt-2 border-amber-500 text-amber-700 hover:bg-amber-100"
+          onClick={() => {
+            setDismissed(true);
+            onAcknowledge();
+          }}
+        >
+          Acknowledge
+        </Button>
       </AlertDescription>
     </Alert>
   );
 };
-
-export default IVReuseAlert;

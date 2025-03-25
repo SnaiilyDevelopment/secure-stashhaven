@@ -98,10 +98,10 @@ export const loginUser = async (email: string, password: string): Promise<boolea
       try {
         // Attempt to decrypt the master key (this will fail if password is wrong)
         const encryptionKey = await importEncryptionKey(derivedKey);
-        const masterKeyBase64 = await decryptTextSecure(encryptedMasterKey, encryptionKey);
+        const masterKeyString = await decryptTextSecure(encryptedMasterKey, encryptionKey);
         
         // Store encryption key
-        localStorage.setItem('encryption_key', masterKeyBase64);
+        localStorage.setItem('encryption_key', masterKeyString);
         
         // Clear login attempts on successful login
         loginAttempts.delete(email);
@@ -384,10 +384,3 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
 export const getCurrentUserEncryptionKey = (): string | null => {
   return localStorage.getItem('encryption_key');
 };
-
-// Helper function to convert ArrayBuffer to Base64 string
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const byteArray = new Uint8Array(buffer);
-  const base64String = btoa(String.fromCharCode(...byteArray));
-  return base64String;
-}

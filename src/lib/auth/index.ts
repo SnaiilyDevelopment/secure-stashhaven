@@ -1,5 +1,6 @@
+
 import { toast } from "@/components/ui/use-toast";
-import { deriveKeyFromPassword, encryptTextSecure, decryptTextSecure, generateEncryptionKey } from "../encryption";
+import { generateEncryptionKey } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
 
 // Authentication errors that can be shown to users
@@ -199,4 +200,4 @@ export const handleAuthError = (authStatus: AuthStatus): void => {
 export { registerUser, loginUser, signInWithProvider, logoutUser } from './userAuth';
 
 // Export getCurrentUserEncryptionKey from storage/fileOperations
-export { getCurrentUserEncryptionKey } from '../storage/fileOperations';
+export { getCurrentUserEncryptionKey } from './userAuth';

@@ -1,166 +1,192 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Toaster } from '@/components/ui/toaster';
+import { Button } from '@/components/ui/button';
 import { 
-  LockKeyhole, 
-  LogOut, 
-  User, 
+  Menu, 
+  Shield, 
   Files, 
   Settings, 
-  ChevronRight
+  User, 
+  Home, 
+  LogOut,
+  X
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { logoutUser } from '@/lib/auth';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
 
-interface MainLayoutProps {
-  children: React.ReactNode;
-}
-
-const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const location = useLocation();
+const MainLayout: React.FC = () => {
+  const { user, isLoading, logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
-  
+
   useEffect(() => {
-    // Set up authentication listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session && !!localStorage.getItem('encryption_key'));
-      setIsLoading(false);
-    });
-    
-    // Check initial authentication status
-    const checkAuth = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        setIsAuthenticated(!!data.session && !!localStorage.getItem('encryption_key'));
-      } catch (error) {
-        console.error("Error checking authentication:", error);
-      } finally {
-        setIsLoading(false);
-      }
+    // If not authenticated and not loading, redirect to login
+    if (!isLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, isLoading, navigate]);
+
+  // Close sidebar on route change
+  useEffect(() => {
+    const handleRouteChange = () => {
+      setSidebarOpen(false);
     };
     
-    checkAuth();
+    window.addEventListener('popstate', handleRouteChange);
     
     return () => {
-      subscription.unsubscribe();
+      window.removeEventListener('popstate', handleRouteChange);
     };
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      setIsLoading(true);
-      
-      await logoutUser();
-      
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      });
-      
-      // Navigate to login page
-      navigate('/login', { replace: true });
-    } catch (error) {
-      console.error("Logout error:", error);
-      toast({
-        title: "Logout failed",
-        description: "An error occurred during logout. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  // Toggle sidebar
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
   };
 
-  // Don't render sidebar on auth pages
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
-  
   if (isLoading) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center">
-        <div className="animate-pulse-subtle flex flex-col items-center gap-3">
-          <LockKeyhole size={40} className="text-primary animate-float" />
-          <p className="text-muted-foreground animate-fade-in">Loading secure vault...</p>
-        </div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {isAuthenticated && !isAuthPage && (
-        <aside className="w-64 border-r border-border bg-card/50 backdrop-blur-xs h-screen sticky top-0 flex flex-col transition-all duration-300 animate-slide-up">
-          <div className="p-4 flex items-center space-x-2 border-b border-border h-16">
-            <LockKeyhole className="h-6 w-6 text-primary" />
-            <h1 className="font-medium text-xl">SecureVault</h1>
-          </div>
-          
-          <nav className="flex-1 px-2 py-4 space-y-1">
-            <NavigationLink to="/dashboard" active={location.pathname === '/dashboard'} icon={<Files size={18} />}>
-              My Files
-            </NavigationLink>
-            <NavigationLink to="/profile" active={location.pathname === '/profile'} icon={<User size={18} />}>
-              Profile
-            </NavigationLink>
-            <NavigationLink to="/settings" active={location.pathname === '/settings'} icon={<Settings size={18} />}>
-              Settings
-            </NavigationLink>
-          </nav>
-          
-          <div className="p-4 border-t border-border">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm py-4 px-6 flex justify-between items-center">
+        <div className="flex items-center">
+          <Button 
+            variant="ghost"
+            size="icon"
+            aria-label="Menu"
+            onClick={toggleSidebar}
+            className="mr-4 md:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 
+            className="text-xl font-semibold text-green-700 cursor-pointer"
+            onClick={() => navigate('/dashboard')}
+          >
+            SecureVault
+          </h1>
+        </div>
+        <div className="flex items-center space-x-4">
+          {user && (
+            <>
+              <span className="hidden md:inline text-sm text-gray-600">
+                {user.email}
+              </span>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate('/profile')}
+                className="hidden md:flex"
+              >
+                <User className="h-4 w-4 mr-2" />
+                Profile
+              </Button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Sidebar + Content */}
+      <div className="flex min-h-[calc(100vh-64px)]">
+        {/* Sidebar - Mobile Overlay */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/20 z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+        )}
+
+        {/* Sidebar */}
+        <aside 
+          className={`
+            fixed md:sticky top-0 left-0 h-full w-64 bg-white shadow-md z-50 transition-transform duration-300 ease-in-out transform
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          `}
+        >
+          <div className="p-4 flex justify-between items-center border-b">
+            <h2 className="text-xl font-semibold text-green-700">Menu</h2>
             <Button 
-              variant="outline" 
-              className="w-full justify-start gap-2 text-destructive hover:text-destructive"
-              onClick={handleLogout}
+              variant="ghost" 
+              size="icon"
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden"
             >
-              <LogOut size={18} />
-              <span>Sign Out</span>
+              <X className="h-5 w-5" />
             </Button>
           </div>
+          
+          <nav className="p-4 space-y-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/')}
+              className="w-full justify-start"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Home
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/dashboard')}
+              className="w-full justify-start"
+            >
+              <Files className="h-4 w-4 mr-2" />
+              Files
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/settings')}
+              className="w-full justify-start"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/profile')}
+              className="w-full justify-start md:hidden"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Profile
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              onClick={() => logout()}
+              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </nav>
+          
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <Shield className="h-4 w-4 text-green-500" />
+              <span>End-to-End Encrypted</span>
+            </div>
+          </div>
         </aside>
-      )}
+
+        {/* Main Content */}
+        <main className="flex-1 p-6">
+          <Outlet />
+        </main>
+      </div>
       
-      <main className={cn(
-        "flex-1 transition-all duration-300",
-        isAuthenticated && !isAuthPage ? "animate-fade-in" : "w-full animate-scale-in"
-      )}>
-        {children}
-      </main>
+      {/* Toast notifications */}
+      <Toaster />
     </div>
-  );
-};
-
-interface NavigationLinkProps {
-  to: string;
-  active: boolean;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}
-
-const NavigationLink: React.FC<NavigationLinkProps> = ({ to, active, icon, children }) => {
-  return (
-    <Link 
-      to={to} 
-      className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors group hover:bg-secondary",
-        active ? "bg-secondary text-primary" : "text-muted-foreground hover:text-foreground"
-      )}
-    >
-      <span className={cn(
-        "transition-colors",
-        active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-      )}>
-        {icon}
-      </span>
-      <span>{children}</span>
-      {active && (
-        <ChevronRight size={16} className="ml-auto text-primary" />
-      )}
-    </Link>
   );
 };
 
