@@ -32,7 +32,9 @@ export class IVReuseError extends Error {
  */
 export async function generateFileEncryptionKey(): Promise<CryptoKey> {
   try {
-    return await generateEncryptionKey();
+    // Convert the string key to a CryptoKey object
+    const keyString = await generateEncryptionKey();
+    return await importEncryptionKey(keyString);
   } catch (error: any) {
     throw new EncryptionError('Failed to generate file encryption key: ' + (error.message || 'Unknown error'), error);
   }

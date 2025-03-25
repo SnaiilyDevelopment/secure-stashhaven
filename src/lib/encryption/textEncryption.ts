@@ -1,33 +1,44 @@
 
 /**
- * Text encryption utilities for end-to-end encryption
- * Implements secure encryption practices inspired by Matrix E2EE concepts
+ * Text encryption utilities using AES-GCM
+ * Implements secure encryption practices with authentication
  */
 
-import { arrayBufferToBase64, base64ToArrayBuffer } from './core';
+import {
+  generateEncryptionKey,
+  importEncryptionKey,
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  zeroBuffer
+} from './core';
 
-// Error types for text encryption operations
+// Custom error classes for better error handling
 export class TextEncryptionError extends Error {
-  constructor(message: string) {
+  constructor(message: string, public cause?: Error) {
     super(message);
     this.name = 'TextEncryptionError';
   }
 }
 
 export class TextDecryptionError extends Error {
-  constructor(message: string) {
+  constructor(message: string, public cause?: Error) {
     super(message);
     this.name = 'TextDecryptionError';
   }
 }
 
-// Function to encrypt text using AES-GCM
-export const encryptText = async (text: string, key: CryptoKey): Promise<string> => {
+/**
+ * Encrypts text using AES-GCM.
+ * @param {string} text - The text to encrypt.
+ * @param {CryptoKey} key - The encryption key.
+ * @returns {Promise<string>} A promise that resolves with the encrypted text as a base64 string.
+ */
+export async function encryptText(text: string, key: CryptoKey): Promise<string> {
   try {
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
     const encodedText = new TextEncoder().encode(text);
-
-    const encrypted = await window.crypto.subtle.encrypt(
+    
+    const encryptedData = await window.crypto.subtle.encrypt(
       {
         name: "AES-GCM",
         iv: iv
@@ -35,50 +46,118 @@ export const encryptText = async (text: string, key: CryptoKey): Promise<string>
       key,
       encodedText
     );
-
-    const ivArray = Array.from(iv);
-    const encryptedArray = Array.from(new Uint8Array(encrypted));
-    const combinedArray = ivArray.concat(encryptedArray);
-    const combinedBuffer = new Uint8Array(combinedArray).buffer;
-
-    return arrayBufferToBase64(combinedBuffer);
-  } catch (error) {
-    console.error("Text encryption error:", error);
-    throw new TextEncryptionError(`Failed to encrypt text: ${error instanceof Error ? error.message : String(error)}`);
+    
+    // Combine IV and ciphertext
+    const result = new Uint8Array(iv.length + encryptedData.byteLength);
+    result.set(iv, 0);
+    result.set(new Uint8Array(encryptedData), iv.length);
+    
+    return arrayBufferToBase64(result.buffer);
+  } catch (error: any) {
+    throw new TextEncryptionError(`Failed to encrypt text: ${error.message || 'Unknown error'}`, error);
   }
-};
+}
 
-// Function to decrypt text using AES-GCM
-export const decryptText = async (base64String: string, key: CryptoKey): Promise<string> => {
+/**
+ * Decrypts text using AES-GCM.
+ * @param {string} encryptedText - The encrypted text as a base64 string.
+ * @param {CryptoKey} key - The decryption key.
+ * @returns {Promise<string>} A promise that resolves with the decrypted text.
+ */
+export async function decryptText(encryptedText: string, key: CryptoKey): Promise<string> {
   try {
-    const combinedBuffer = base64ToArrayBuffer(base64String);
-    const combinedArray = new Uint8Array(combinedBuffer);
-    const iv = combinedArray.slice(0, 12);
-    const encrypted = combinedArray.slice(12);
-
-    const decrypted = await window.crypto.subtle.decrypt(
+    const encryptedBuffer = base64ToArrayBuffer(encryptedText);
+    const encryptedArray = new Uint8Array(encryptedBuffer);
+    
+    // Extract IV (first 12 bytes)
+    const iv = encryptedArray.slice(0, 12);
+    const ciphertext = encryptedArray.slice(12);
+    
+    const decryptedData = await window.crypto.subtle.decrypt(
       {
         name: "AES-GCM",
         iv: iv
       },
       key,
-      encrypted
+      ciphertext
     );
-
-    const decodedText = new TextDecoder().decode(decrypted);
-    return decodedText;
-  } catch (error) {
-    console.error("Text decryption error:", error);
-    throw new TextDecryptionError(`Failed to decrypt text: ${error instanceof Error ? error.message : String(error)}`);
+    
+    return new TextDecoder().decode(decryptedData);
+  } catch (error: any) {
+    throw new TextDecryptionError(`Failed to decrypt text: ${error.message || 'Unknown error'}`, error);
   }
-};
+}
 
-// Enhanced security version with additional protections
-export const encryptTextSecure = async (text: string, key: CryptoKey): Promise<string> => {
-  return encryptText(text, key);
-};
+/**
+ * Enhanced text encryption with additional security measures.
+ * Uses authenticated encryption with associated data (AEAD).
+ */
+export async function encryptTextSecure(
+  text: string,
+  key: CryptoKey,
+  associatedData?: string
+): Promise<string> {
+  try {
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encodedText = new TextEncoder().encode(text);
+    const encodedAssociatedData = associatedData 
+      ? new TextEncoder().encode(associatedData) 
+      : new Uint8Array(0);
+    
+    const encryptedData = await window.crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: iv,
+        additionalData: encodedAssociatedData
+      },
+      key,
+      encodedText
+    );
+    
+    // Combine IV and ciphertext
+    const result = new Uint8Array(iv.length + encryptedData.byteLength);
+    result.set(iv, 0);
+    result.set(new Uint8Array(encryptedData), iv.length);
+    
+    return arrayBufferToBase64(result.buffer);
+  } catch (error: any) {
+    throw new TextEncryptionError(`Secure encryption failed: ${error.message || 'Unknown error'}`, error);
+  }
+}
 
-// Enhanced security version with additional protections
-export const decryptTextSecure = async (encryptedText: string, key: CryptoKey): Promise<string> => {
-  return decryptText(encryptedText, key);
-};
+/**
+ * Enhanced text decryption with additional security measures.
+ * Uses authenticated encryption with associated data (AEAD).
+ */
+export async function decryptTextSecure(
+  encryptedText: string,
+  key: CryptoKey,
+  associatedData?: string
+): Promise<string> {
+  try {
+    const encryptedBuffer = base64ToArrayBuffer(encryptedText);
+    const encryptedArray = new Uint8Array(encryptedBuffer);
+    
+    // Extract IV (first 12 bytes)
+    const iv = encryptedArray.slice(0, 12);
+    const ciphertext = encryptedArray.slice(12);
+    const encodedAssociatedData = associatedData 
+      ? new TextEncoder().encode(associatedData) 
+      : new Uint8Array(0);
+    
+    const decryptedData = await window.crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: iv,
+        additionalData: encodedAssociatedData
+      },
+      key,
+      ciphertext
+    );
+    
+    const decoded = new TextDecoder().decode(decryptedData);
+    return decoded;
+  } catch (error: any) {
+    throw new TextDecryptionError(`Secure decryption failed: ${error.message || 'Unknown error'}`, error);
+  }
+}

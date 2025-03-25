@@ -20,6 +20,23 @@ interface FileItem {
   encrypted: boolean;
 }
 
+// Create an adapter function to convert our FileItem to match the expected props
+const adaptFilesForList = (
+  files: FileItem[],
+  searchQuery: string,
+  downloadHandler: (id: string) => Promise<void>,
+  deleteHandler: (id: string) => void
+) => {
+  return {
+    files: files.filter(file => 
+      file.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    onDeleteComplete: () => {}, // We'll handle this directly in the component
+    isLoading: false,
+    emptyMessage: "No files found. Upload your first encrypted file.",
+  };
+};
+
 const Dashboard = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -231,22 +248,14 @@ const Dashboard = () => {
         </header>
         
         <FileList 
-          files={files.map(file => ({
-            id: file.id,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            encryptedType: file.encryptedType,
-            dateAdded: file.dateAdded,
-            encrypted: file.encrypted
-          }))}
-          searchQuery={searchQuery}
-          activeTab={activeTab}
+          {...adaptFilesForList(files, searchQuery, downloadFile, deleteFile)}
           isLoading={isUploading}
-          setActiveTab={setActiveTab}
-          handleFileUpload={handleFileUpload}
-          downloadFile={downloadFile}
-          deleteFile={deleteFile}
+          onDeleteComplete={() => {
+            // This function will be called after file deletion
+            console.log('File deletion completed');
+          }}
+          onViewFile={(fileId) => downloadFile(fileId)}
+          onDeleteFile={(fileId) => deleteFile(fileId)}
         />
       </div>
     </ThreeDLayout>

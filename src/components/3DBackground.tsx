@@ -184,6 +184,7 @@ const BackgroundScene: React.FC<BackgroundSceneProps> = ({
   return <div ref={containerRef} className="absolute top-0 left-0 w-full h-full -z-10" />;
 };
 
+// Helper function for disposing Three.js objects with proper type definitions
 const dispose = (object: THREE.Object3D): void => {
   // Recursively dispose of all children
   object.children.forEach((child: THREE.Object3D) => dispose(child));

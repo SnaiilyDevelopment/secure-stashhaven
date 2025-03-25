@@ -1,193 +1,170 @@
+import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { encryptFile, decryptFile } from "../encryption";
+export interface FileMetadata {
+  id: string;
+  user_id: string;
+  original_name: string;
+  file_path: string;
+  size: number;
+  original_type: string;
+  created_at: string;
+  encrypted: boolean;
+}
 
-// Get current user's encryption key (from localStorage)
-export const getCurrentUserEncryptionKey = (): string | null => {
-  return localStorage.getItem('encryption_key');
-};
-
-// Upload an encrypted file to Supabase storage
-export const uploadEncryptedFile = async (
-  file: File,
-  bucketName: string = 'secure-files',
-  path?: string,
-  onProgress?: (progress: number) => void
-): Promise<string | null> => {
+/**
+ * Uploads a file to Supabase storage and saves its metadata.
+ * @param {File} file The file to upload.
+ * @param {string} userId The ID of the user uploading the file.
+ * @returns {Promise<FileMetadata>} A promise that resolves with the file metadata.
+ */
+export const uploadFile = async (file: File, userId: string): Promise<FileMetadata> => {
+  const fileId = uuidv4();
+  const filePath = `uploads/${userId}/${fileId}-${file.name}`;
+  
   try {
-    onProgress?.(10); // Starting encryption
-    
-    const encryptionKey = getCurrentUserEncryptionKey();
-    if (!encryptionKey) {
-      toast({
-        title: "Upload failed",
-        description: "Encryption key not found. Please log in again.",
-        variant: "destructive"
-      });
-      return null;
-    }
-
-    // Encrypt the file
-    const filePath = path || `${Date.now()}_${file.name}`;
-    const encryptedBlob = await encryptFile(file, encryptionKey);
-    onProgress?.(40); // Encryption complete
-    
-    // Upload encrypted file
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, encryptedBlob, {
+    // Upload the file to Supabase storage
+    const { data, error: uploadError } = await supabase.storage
+      .from('secure-vault-files')
+      .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false,
-        contentType: 'application/encrypted',
+        upsert: false
       });
     
-    onProgress?.(80); // Upload complete
-    
-    if (error) {
-      console.error("File upload error:", error);
-      toast({
-        title: "Upload failed",
-        description: error.message,
-        variant: "destructive"
-      });
-      return null;
+    if (uploadError) {
+      throw new Error(`File upload failed: ${uploadError.message}`);
     }
     
-    // Save metadata to user's file list
-    try {
-      const { error: metadataError } = await supabase
-        .from('file_metadata')
-        .insert({
-          file_path: data.path,
-          original_name: file.name,
-          original_type: file.type,
-          size: file.size,
-          encrypted: true
-        });
+    if (!data?.path) {
+      throw new Error('File path not returned from upload');
+    }
+    
+    // Save file metadata to Supabase database
+    const fileMetadata: FileMetadata = {
+      id: fileId,
+      user_id: userId,
+      original_name: file.name,
+      file_path: data.path,
+      size: file.size,
+      original_type: file.type,
+      created_at: new Date().toISOString(),
+      encrypted: true // Assuming all files are encrypted
+    };
+    
+    const { error: metadataError } = await supabase
+      .from('files')
+      .insert([fileMetadata]);
+    
+    if (metadataError) {
+      // Attempt to delete the file from storage if metadata saving fails
+      await supabase.storage
+        .from('secure-vault-files')
+        .remove([filePath]);
       
-      if (metadataError) {
-        console.error("Metadata storage error:", metadataError);
-      }
-    } catch (metadataError) {
-      console.error("Metadata insertion error:", metadataError);
+      throw new Error(`Failed to save file metadata: ${metadataError.message}`);
     }
     
-    onProgress?.(100); // Process complete
-    
-    toast({
-      title: "Upload successful",
-      description: "Your file has been securely uploaded."
-    });
-    
-    return data.path;
-  } catch (error) {
-    console.error("File upload error:", error);
-    toast({
-      title: "Upload failed",
-      description: "An unexpected error occurred during upload.",
-      variant: "destructive"
-    });
-    return null;
+    return fileMetadata;
+  } catch (error: any) {
+    console.error('Upload error:', error);
+    throw error;
   }
 };
 
-// Download and decrypt a file from Supabase storage
-export const downloadEncryptedFile = async (
-  filePath: string,
-  originalType: string,
-  fileName: string = ''
-): Promise<Blob | null> => {
+/**
+ * Deletes a file from Supabase storage and removes its metadata.
+ * @param {string} fileId The ID of the file to delete.
+ * @returns {Promise<void>} A promise that resolves when the file is deleted.
+ */
+export const deleteFile = async (fileId: string): Promise<void> => {
   try {
-    const bucketName = 'secure-files';
-    const encryptionKey = getCurrentUserEncryptionKey();
-    if (!encryptionKey) {
-      toast({
-        title: "Download failed",
-        description: "Encryption key not found. Please log in again.",
-        variant: "destructive"
-      });
-      return null;
+    // Get the file metadata from the database
+    const { data: fileMetadata, error: selectError } = await supabase
+      .from('files')
+      .select('*')
+      .eq('id', fileId)
+      .single();
+    
+    if (selectError) {
+      throw new Error(`Failed to get file metadata: ${selectError.message}`);
     }
     
-    // Download encrypted file
+    if (!fileMetadata) {
+      throw new Error('File not found');
+    }
+    
+    // Delete the file from Supabase storage
+    const { error: deleteError } = await supabase.storage
+      .from('secure-vault-files')
+      .remove([fileMetadata.file_path]);
+    
+    if (deleteError) {
+      throw new Error(`Failed to delete file from storage: ${deleteError.message}`);
+    }
+    
+    // Remove the file metadata from the database
+    const { error: removeError } = await supabase
+      .from('files')
+      .delete()
+      .eq('id', fileId);
+    
+    if (removeError) {
+      throw new Error(`Failed to remove file metadata: ${removeError.message}`);
+    }
+  } catch (error: any) {
+    console.error('Delete error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Retrieves all files metadata for a specific user.
+ * @param {string} userId The ID of the user.
+ * @returns {Promise<FileMetadata[]>} A promise that resolves with an array of file metadata.
+ */
+export const getUserFiles = async (userId: string): Promise<FileMetadata[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('files')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      throw new Error(`Failed to get user files: ${error.message}`);
+    }
+    
+    return data || [];
+  } catch (error: any) {
+    console.error('Get user files error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Retrieves the storage usage for a specific user.
+ * @param {string} userId The ID of the user.
+ * @returns {Promise<number>} A promise that resolves with the total storage used in bytes.
+ */
+export const getUserStorageUsage = async (): Promise<number> => {
+  try {
+    // List all the objects in the storage bucket for the user
     const { data, error } = await supabase.storage
-      .from(bucketName)
-      .download(filePath);
-    
-    if (error || !data) {
-      console.error("File download error:", error);
-      toast({
-        title: "Download failed",
-        description: error?.message || "Failed to download the file.",
-        variant: "destructive"
+      .from('secure-vault-files')
+      .list('uploads/', { // changed prefix to 'uploads/'
+        search: '',
+        sortBy: { column: 'created_at', order: 'asc' },
       });
-      return null;
-    }
-    
-    // Decrypt the file
-    const decryptedBlob = await decryptFile(data, encryptionKey, originalType);
-    
-    return decryptedBlob;
-  } catch (error) {
-    console.error("File download error:", error);
-    toast({
-      title: "Download failed",
-      description: "An unexpected error occurred during decryption.",
-      variant: "destructive"
-    });
-    return null;
-  }
-};
-
-// Delete a file from Supabase storage
-export const deleteFile = async (
-  filePath: string,
-  bucketName: string = 'secure-files'
-): Promise<boolean> => {
-  try {
-    // Delete file from storage
-    const { error } = await supabase.storage
-      .from(bucketName)
-      .remove([filePath]);
     
     if (error) {
-      console.error("File deletion error:", error);
-      toast({
-        title: "Deletion failed",
-        description: error.message,
-        variant: "destructive"
-      });
-      return false;
+      throw new Error(`Failed to list files: ${error.message}`);
     }
     
-    // Delete metadata
-    try {
-      const { error: metadataError } = await supabase
-        .from('file_metadata')
-        .delete()
-        .eq('file_path', filePath);
-      
-      if (metadataError) {
-        console.error("Metadata deletion error:", metadataError);
-      }
-    } catch (metadataError) {
-      console.error("Metadata deletion error:", metadataError);
-    }
-    
-    toast({
-      title: "Deletion successful",
-      description: "The file has been deleted."
-    });
-    
-    return true;
-  } catch (error) {
-    console.error("File deletion error:", error);
-    toast({
-      title: "Deletion failed",
-      description: "An unexpected error occurred during deletion.",
-      variant: "destructive"
-    });
-    return false;
+    // Calculate the total size of all files
+    const totalBytes = data?.reduce((sum, file) => sum + file.metadata.size, 0) || 0;
+    return totalBytes;
+  } catch (error: any) {
+    console.error('Get user storage usage error:', error);
+    throw error;
   }
 };

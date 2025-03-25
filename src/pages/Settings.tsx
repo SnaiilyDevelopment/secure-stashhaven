@@ -18,14 +18,12 @@ interface StorageStats {
 }
 
 const Settings = () => {
-  const { user, logoutUser } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, logout } = useAuth();
   const [storageStats, setStorageStats] = useState<StorageStats>({ totalSize: 0, fileCount: 0 });
   
   useEffect(() => {
     const fetchStorageStats = async () => {
       try {
-        setIsLoading(true);
         const totalBytes = await getUserStorageUsage();
         setStorageStats({
           totalSize: totalBytes,
@@ -33,8 +31,6 @@ const Settings = () => {
         });
       } catch (error) {
         console.error("Error fetching storage stats:", error);
-      } finally {
-        setIsLoading(false);
       }
     };
     
@@ -52,7 +48,7 @@ const Settings = () => {
   
   const handleLogout = async () => {
     try {
-      await logoutUser();
+      await logout();
     } catch (error) {
       console.error("Error logging out:", error);
     }
