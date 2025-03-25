@@ -1,15 +1,11 @@
-
 /**
  * Text encryption utilities using AES-GCM
  * Implements secure encryption practices with authentication
  */
 
 import {
-  generateEncryptionKey,
-  importEncryptionKey,
   arrayBufferToBase64,
   base64ToArrayBuffer,
-  zeroBuffer
 } from './core';
 
 // Custom error classes for better error handling

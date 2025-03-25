@@ -1,17 +1,21 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Shield, HardDrive, Key, Users, Download } from 'lucide-react';
+import { Shield, HardDrive, Key, Users, Download, Lock, EyeOff, CloudOff, AlertTriangle } from 'lucide-react';
 import ThreeDLayout from '@/components/layout/3DLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { useState } from 'react';
+import { useToast } from "@/components/ui/use-toast";
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { toast } = useToast();
+  const [backupEnabled, setBackupEnabled] = useState(false);
+  const [autoLogout, setAutoLogout] = useState(true);
   
   if (!user) {
     navigate('/login');
@@ -77,7 +81,7 @@ const Settings = () => {
                   Automatically back up your encrypted files
                 </p>
               </div>
-              <Switch />
+              <Switch checked={backupEnabled} onChange={() => setBackupEnabled(!backupEnabled)} />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-1">

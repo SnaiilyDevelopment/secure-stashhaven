@@ -42,6 +42,7 @@ export const uploadFile = async (file: File, userId: string): Promise<FileMetada
     }
     
     // Save file metadata to Supabase database
+    const currentTime = new Date().toISOString();
     const fileMetadata: FileMetadata = {
       id: fileId,
       user_id: userId,
@@ -49,7 +50,8 @@ export const uploadFile = async (file: File, userId: string): Promise<FileMetada
       file_path: data.path,
       size: file.size,
       original_type: file.type,
-      created_at: new Date().toISOString(),
+      created_at: currentTime,
+      updated_at: currentTime,
       encrypted: true // Assuming all files are encrypted
     };
     

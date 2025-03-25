@@ -1,4 +1,3 @@
-
 /**
  * File encryption utilities using AES-CBC with SHA-256 HMAC for integrity
  * Implements secure encryption practices inspired by NaCl secretbox
@@ -7,7 +6,6 @@
 import { 
   generateEncryptionKey, 
   importEncryptionKey,
-  exportEncryptionKey
 } from './core';
 
 // Custom error classes for better error handling
