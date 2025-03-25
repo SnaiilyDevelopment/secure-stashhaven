@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import { 
   deriveKeyFromPassword, 
@@ -6,8 +5,7 @@ import {
   decryptTextSecure, 
   generateEncryptionKey, 
   importEncryptionKey,
-  zeroBuffer,
-  arrayBufferToBase64
+  zeroBuffer
 } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -97,11 +95,10 @@ export const loginUser = async (email: string, password: string): Promise<boolea
       
       try {
         // Attempt to decrypt the master key (this will fail if password is wrong)
-        const encryptionKey = await importEncryptionKey(derivedKey);
-        const masterKeyString = await decryptTextSecure(encryptedMasterKey, encryptionKey);
+        const masterKeyBase64 = await decryptTextSecure(encryptedMasterKey, derivedKey);
         
         // Store encryption key
-        localStorage.setItem('encryption_key', masterKeyString);
+        localStorage.setItem('encryption_key', masterKeyBase64);
         
         // Clear login attempts on successful login
         loginAttempts.delete(email);
@@ -270,11 +267,8 @@ export const registerUser = async (email: string, password: string, confirmPassw
     // Generate a random encryption master key
     const masterKeyBase64 = await generateEncryptionKey();
     
-    // Import the derived key for encryption
-    const encryptionKey = await importEncryptionKey(derivedKey);
-    
     // Encrypt the master key with the derived key
-    const encryptedMasterKey = await encryptTextSecure(masterKeyBase64, encryptionKey);
+    const encryptedMasterKey = await encryptTextSecure(masterKeyBase64, derivedKey);
     
     try {
       // Sign up with Supabase

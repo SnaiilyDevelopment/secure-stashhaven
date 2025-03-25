@@ -1,45 +1,43 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileMetadata } from '@/lib/types';
+import { FileItemAdapter } from '@/lib/types';
 import FileCard from './FileCard';
 
 interface FileListProps {
-  files: FileMetadata[];
-  onFileClick?: (file: FileMetadata) => void;
-  onDeleteFile?: (file: FileMetadata) => void;
-  onShareFile?: (file: FileMetadata) => void;
+  files: FileItemAdapter[];
+  onDeleteComplete?: () => void;
   isLoading?: boolean;
+  emptyMessage?: string;
 }
 
 const FileList: React.FC<FileListProps> = ({
   files,
-  onFileClick,
-  onDeleteFile,
-  onShareFile,
-  isLoading = false
+  onDeleteComplete,
+  isLoading = false,
+  emptyMessage = "No files found"
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'images' | 'docs' | 'other'>('all');
   
   const filteredFiles = files.filter(file => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'images' && file.original_type?.startsWith('image/')) return true;
+    if (activeTab === 'images' && file.type?.startsWith('image/')) return true;
     if (activeTab === 'docs' && (
-      file.original_type?.includes('document') || 
-      file.original_type?.includes('pdf') ||
-      file.original_type?.includes('word') ||
-      file.original_type?.includes('excel') ||
-      file.original_type?.includes('text') ||
-      file.original_type?.includes('spreadsheet')
+      file.type?.includes('document') || 
+      file.type?.includes('pdf') ||
+      file.type?.includes('word') ||
+      file.type?.includes('excel') ||
+      file.type?.includes('text') ||
+      file.type?.includes('spreadsheet')
     )) return true;
     if (activeTab === 'other' && 
-      !file.original_type?.startsWith('image/') && 
-      !file.original_type?.includes('document') && 
-      !file.original_type?.includes('pdf') &&
-      !file.original_type?.includes('word') &&
-      !file.original_type?.includes('excel') &&
-      !file.original_type?.includes('text') &&
-      !file.original_type?.includes('spreadsheet')
+      !file.type?.startsWith('image/') && 
+      !file.type?.includes('document') && 
+      !file.type?.includes('pdf') &&
+      !file.type?.includes('word') &&
+      !file.type?.includes('excel') &&
+      !file.type?.includes('text') &&
+      !file.type?.includes('spreadsheet')
     ) return true;
     return false;
   });
@@ -68,14 +66,17 @@ const FileList: React.FC<FileListProps> = ({
             <FileCard
               key={file.id}
               file={file}
-              onClick={() => onFileClick?.(file)}
-              onDelete={() => onDeleteFile?.(file)}
-              onShare={() => onShareFile?.(file)}
+              onDelete={() => {
+                // Handle delete
+                if (onDeleteComplete) {
+                  onDeleteComplete();
+                }
+              }}
             />
           ))
         ) : (
           <div className="col-span-full text-center py-20 text-gray-500">
-            No files found in this category
+            {emptyMessage}
           </div>
         )}
       </div>

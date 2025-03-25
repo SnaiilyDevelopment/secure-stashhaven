@@ -17,8 +17,8 @@ export {
 
 // Export text encryption (using named imports to avoid conflicts with core)
 export { 
-  encryptText as encryptTextSecure,
-  decryptText as decryptTextSecure,
+  encryptTextSecure,
+  decryptTextSecure,
   TextEncryptionError,
   TextDecryptionError
 } from './textEncryption';
@@ -33,6 +33,3 @@ export {
 
 // Export device keys utilities
 export * from './deviceKeys';
-
-// Export the IVReuseAlert component
-export { IVReuseAlert } from '@/components/encryption/IVReuseAlert';

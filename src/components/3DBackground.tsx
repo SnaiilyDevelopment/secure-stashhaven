@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 interface BackgroundSceneProps {
   intensity?: number;
@@ -189,14 +188,18 @@ const dispose = (object: THREE.Object3D): void => {
   object.children.forEach((child) => dispose(child));
   
   // Dispose of geometries
-  if ((object as THREE.Mesh).geometry) {
-    (object as THREE.Mesh).geometry.dispose();
+  if ('geometry' in object && object.geometry) {
+    object.geometry.dispose();
   }
   
   // Dispose of materials
-  if ((object as THREE.Mesh).material) {
-    const material = (object as THREE.Mesh).material as THREE.Material;
-    material.dispose();
+  if ('material' in object && object.material) {
+    const material = object.material as THREE.Material | THREE.Material[];
+    if (Array.isArray(material)) {
+      material.forEach(m => m.dispose());
+    } else {
+      material.dispose();
+    }
   }
 };
 

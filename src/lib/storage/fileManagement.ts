@@ -5,7 +5,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserEncryptionKey } from '@/lib/auth';
-import { ensureStorageBucket } from './storageUtils';
 
 // File metadata type
 export interface FileMetadata {

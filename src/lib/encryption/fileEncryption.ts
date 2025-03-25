@@ -5,8 +5,7 @@
  */
 
 import { toast } from "@/components/ui/use-toast";
-import { IVReuseAlert } from '@/components/encryption/IVReuseAlert';
-import { importEncryptionKey, arrayBufferToBase64, base64ToArrayBuffer, zeroBuffer } from './core';
+import { importEncryptionKey, arrayBufferToBase64 } from './core';
 
 // Track used IVs to prevent reuse (security risk)
 const usedIVs = new Set<string>();
@@ -61,28 +60,12 @@ const fileToArrayBuffer = (file: File): Promise<ArrayBuffer> => {
   });
 };
 
-// Calculate hash of file for integrity verification
-const calculateFileHash = async (buffer: ArrayBuffer): Promise<string> => {
-  try {
-    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-    return arrayBufferToBase64(hashBuffer);
-  } catch (error: any) {
-    console.error("Hash calculation error:", error);
-    throw new EncryptionError("Failed to calculate file hash", error);
-  }
-};
-
 // Encrypt a file with AES-GCM
 export const encryptFile = async (
   file: File,
   key: CryptoKey | string,
-  filePath: string
-): Promise<{ 
-  encrypted: Blob, 
-  iv: string, 
-  originalName: string, 
-  originalType: string 
-}> => {
+  filePath: string = file.name // Default to filename if no path provided
+): Promise<Blob> => {
   try {
     console.log(`Beginning encryption for file: ${file.name}`);
     
@@ -109,9 +92,8 @@ export const encryptFile = async (
           variant: "default"
         });
         
-        // Generate a new IV and continue
-        const newIV = generateIV();
-        return await encryptFile(file, cryptoKey, filePath);
+        // Generate a new IV and continue with recursion
+        return encryptFile(file, cryptoKey, filePath);
       } else {
         throw error;
       }
@@ -159,15 +141,7 @@ export const encryptFile = async (
     result.set(new Uint8Array(encrypted), iv.length);
     
     // Convert to Blob for storage
-    const encryptedBlob = new Blob([result], { type: 'application/octet-stream' });
-    
-    console.log(`Encryption complete for file: ${file.name}`);
-    return {
-      encrypted: encryptedBlob,
-      iv: arrayBufferToBase64(iv.buffer),
-      originalName: file.name,
-      originalType: file.type
-    };
+    return new Blob([result], { type: 'application/octet-stream' });
   } catch (error: any) {
     console.error("File encryption error:", error);
     throw new EncryptionError(
@@ -179,17 +153,23 @@ export const encryptFile = async (
 
 // Decrypt a file with AES-GCM
 export const decryptFile = async (
-  encryptedData: ArrayBuffer,
+  encryptedBlob: Blob | ArrayBuffer,
   key: CryptoKey | string,
+  originalType: string = '',
+  fileName: string = '',
   onIVReuseDetected?: (filePath: string) => void,
   filePath?: string
-): Promise<{ 
-  decrypted: Blob, 
-  fileName: string, 
-  fileType: string 
-}> => {
+): Promise<Blob> => {
   try {
     console.log("Beginning file decryption");
+    
+    // Convert Blob to ArrayBuffer if needed
+    let encryptedData: ArrayBuffer;
+    if (encryptedBlob instanceof Blob) {
+      encryptedData = await encryptedBlob.arrayBuffer();
+    } else {
+      encryptedData = encryptedBlob;
+    }
     
     // Convert string key to CryptoKey if necessary
     const cryptoKey = typeof key === 'string' 
@@ -205,11 +185,9 @@ export const decryptFile = async (
     const ivString = arrayBufferToBase64(iv.buffer);
     
     // Check if IV has been used before (excluding current decryption)
-    if (usedIVs.has(ivString) && filePath) {
+    if (usedIVs.has(ivString) && filePath && onIVReuseDetected) {
       console.warn(`IV reuse detected during decryption for: ${filePath}`);
-      if (onIVReuseDetected) {
-        onIVReuseDetected(filePath);
-      }
+      onIVReuseDetected(filePath);
     } else if (filePath) {
       // Add to used IVs set
       usedIVs.add(ivString);
@@ -241,15 +219,11 @@ export const decryptFile = async (
     // Extract file data
     const fileData = decryptedArray.slice(4 + metadataLength);
     
-    // Create blob with original file type
-    const decryptedBlob = new Blob([fileData], { type: metadata.type });
+    // Use provided type or fallback to metadata
+    const fileType = originalType || metadata.type;
     
-    console.log(`Decryption complete, file: ${metadata.name}`);
-    return {
-      decrypted: decryptedBlob,
-      fileName: metadata.name,
-      fileType: metadata.type
-    };
+    // Create blob with original file type
+    return new Blob([fileData], { type: fileType });
   } catch (error: any) {
     console.error("File decryption error:", error);
     

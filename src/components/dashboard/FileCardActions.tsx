@@ -29,28 +29,37 @@ const FileCardActions: React.FC<FileCardActionsProps> = ({
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   const handleDownload = async () => {
-    const decryptedBlob = await downloadEncryptedFile(filePath, fileName, fileType);
-    
-    if (decryptedBlob) {
-      // Create a URL for the blob
-      const url = URL.createObjectURL(decryptedBlob);
+    try {
+      const decryptedBlob = await downloadEncryptedFile(filePath, fileType, fileName);
       
-      // Create a link element
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      
-      // Click the link to trigger the download
-      a.click();
-      
-      // Clean up
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      if (decryptedBlob) {
+        // Create a URL for the blob
+        const url = URL.createObjectURL(decryptedBlob);
+        
+        // Create a link element
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        
+        // Click the link to trigger the download
+        a.click();
+        
+        // Clean up
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        toast({
+          title: "Download complete",
+          description: `${fileName} has been decrypted and downloaded.`
+        });
+      }
+    } catch (error) {
+      console.error("Download error:", error);
       toast({
-        title: "Download complete",
-        description: `${fileName} has been decrypted and downloaded.`
+        title: "Download failed",
+        description: "Failed to download or decrypt the file.",
+        variant: "destructive"
       });
     }
   };

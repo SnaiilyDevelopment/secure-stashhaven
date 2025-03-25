@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { encryptFile, decryptFile } from "../encryption";
@@ -28,11 +29,9 @@ export const uploadEncryptedFile = async (
     }
 
     // Encrypt the file
-    const encryptedBlob = await encryptFile(file, encryptionKey);
-    onProgress?.(40); // Encryption complete
-    
-    // Create a file path if not provided
     const filePath = path || `${Date.now()}_${file.name}`;
+    const encryptedBlob = await encryptFile(file, encryptionKey, filePath);
+    onProgress?.(40); // Encryption complete
     
     // Upload encrypted file
     const { data, error } = await supabase.storage
@@ -97,10 +96,10 @@ export const uploadEncryptedFile = async (
 export const downloadEncryptedFile = async (
   filePath: string,
   originalType: string,
-  bucketName: string = 'secure-files',
   fileName: string = ''
 ): Promise<Blob | null> => {
   try {
+    const bucketName = 'secure-files';
     const encryptionKey = getCurrentUserEncryptionKey();
     if (!encryptionKey) {
       toast({
