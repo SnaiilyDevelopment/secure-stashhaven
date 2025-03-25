@@ -17,7 +17,7 @@ import { AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { uploadFile } from '@/lib/storage';
 import { ensureStorageBucket } from '@/lib/storage/storageUtils';
-import { getCurrentUser } from '@/lib/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
 
 interface UploadDialogProps {
@@ -36,6 +36,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const BUCKET_NAME = 'secure-files';
+  const { user } = useAuth();
   
   // Ensure the storage bucket exists when dialog opens
   useEffect(() => {
@@ -59,6 +60,11 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       return;
     }
     
+    if (!user) {
+      setError("You must be logged in to upload files");
+      return;
+    }
+    
     setIsUploading(true);
     setProgress(0);
     setError(null);
@@ -72,14 +78,8 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         });
       }, 500);
       
-      // Get the current user
-      const currentUser = getCurrentUser();
-      if (!currentUser) {
-        throw new Error("You must be logged in to upload files");
-      }
-      
       // Upload the file
-      const fileMetadata = await uploadFile(selectedFile, currentUser.id);
+      const fileMetadata = await uploadFile(selectedFile, user.id);
       
       // Update progress to 100% when upload is complete
       clearInterval(progressInterval);

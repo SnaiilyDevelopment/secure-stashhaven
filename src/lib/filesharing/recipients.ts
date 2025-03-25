@@ -33,10 +33,10 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
       const validPermission = isValidPermission(permission) ? permission : 'view';
       
       return {
-        id: item.share_id,
-        email: item.recipient_email,
+        share_id: item.share_id,
+        recipient_email: item.recipient_email,
         permissions: validPermission,
-        shared_at: item.created_at || new Date().toISOString()
+        created_at: item.created_at || new Date().toISOString()
       };
     });
     

@@ -10,6 +10,7 @@ export interface FileMetadata {
   size: number;
   original_type: string;
   created_at: string;
+  updated_at: string;
   encrypted: boolean;
 }
 

@@ -1,5 +1,4 @@
 
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, logoutUser } = useAuth();
+  const { user, logout } = useAuth();
   
   if (!user) {
     // Redirect to login if no user
@@ -72,7 +71,7 @@ const Profile = () => {
             <Button variant="outline" onClick={() => navigate('/settings')}>
               Settings
             </Button>
-            <Button variant="destructive" onClick={logoutUser}>
+            <Button variant="destructive" onClick={logout}>
               Log Out
             </Button>
           </CardFooter>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   DropdownMenu,
@@ -16,14 +15,12 @@ import ShareFileDialog from './ShareFileDialog';
 interface FileCardActionsProps {
   filePath: string;
   fileName: string;
-  fileType: string;
   onDelete: () => void;
 }
 
 const FileCardActions: React.FC<FileCardActionsProps> = ({
   filePath,
   fileName,
-  fileType,
   onDelete
 }) => {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);

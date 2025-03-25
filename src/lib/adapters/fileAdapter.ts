@@ -42,7 +42,7 @@ export const adaptSharedFileToFileItem = (file: SharedFile): FileItemAdapter => 
     size: file.size || 0, // Add default value
     type: file.original_type,
     encryptedType: 'application/encrypted',
-    dateAdded: file.shared_at,
+    dateAdded: file.created_at,
     encrypted: true,
     isShared: true,
     owner: file.owner_email || 'Unknown'
