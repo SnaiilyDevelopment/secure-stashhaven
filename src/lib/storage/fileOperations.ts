@@ -92,9 +92,9 @@ export const uploadEncryptedFile = async (
 // Download and decrypt a file from Supabase storage
 export const downloadEncryptedFile = async (
   filePath: string,
-  originalName: string,
   originalType: string,
-  bucketName: string = 'secure-files'
+  bucketName: string = 'secure-files',
+  fileName: string = ''
 ): Promise<Blob | null> => {
   try {
     const encryptionKey = getCurrentUserEncryptionKey();
@@ -123,7 +123,7 @@ export const downloadEncryptedFile = async (
     }
     
     // Decrypt the file
-    const decryptedBlob = await decryptFile(data, encryptionKey, originalType);
+    const decryptedBlob = await decryptFile(data, encryptionKey, originalType, fileName);
     
     return decryptedBlob;
   } catch (error) {

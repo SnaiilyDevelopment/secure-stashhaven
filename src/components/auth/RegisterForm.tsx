@@ -6,13 +6,11 @@ import {
   ArrowRight, 
   Loader2, 
   ShieldCheck,
-  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import { registerUser } from '@/lib/auth';
 import { useToast } from '@/components/ui/use-toast';
 import OAuthButtons from './OAuthButtons';
@@ -24,7 +22,7 @@ const RegisterForm: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+  const [isOAuthLoading] = useState(false);
   const [consentGiven, setConsentGiven] = useState(false);
   const [captchaText, setCaptchaText] = useState('');
   const [userCaptcha, setUserCaptcha] = useState('');
@@ -142,7 +140,7 @@ const RegisterForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const success = await registerUser(email, password);
+      const success = await registerUser(email, password, confirmPassword);
       if (success) {
         navigate('/dashboard');
       }

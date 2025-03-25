@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, KeyRound, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,7 @@ const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+  const [isOAuthLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [loginAttempts, setLoginAttempts] = useState(0);
@@ -168,17 +167,17 @@ const LoginForm: React.FC = () => {
               variant: "destructive"
             });
           } else {
-      let errorMsg = "Login failed. Please check your credentials and try again.";
-      if (error.message === "Login timed out") {
-        errorMsg = "Login took too long. Please check your connection and try again.";
-      } else if (error.message.includes("rate limit")) {
-        errorMsg = "Too many attempts. Please wait before trying again.";
-      }
-      toast({
-        title: "Login Failed",
-        description: errorMsg,
-        variant: "destructive"
-      });
+            let errorMsg = "Login failed. Please check your credentials and try again.";
+            if (error.message === "Login timed out") {
+              errorMsg = "Login took too long. Please check your connection and try again.";
+            } else if (error.message.includes("rate limit")) {
+              errorMsg = "Too many attempts. Please wait before trying again.";
+            }
+            toast({
+              title: "Login Failed",
+              description: errorMsg,
+              variant: "destructive"
+            });
           }
           return false;
         });
@@ -235,19 +234,23 @@ const LoginForm: React.FC = () => {
           }
         };
       }
+      
+      return undefined; // Add explicit return for all code paths
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.error("Login error:", error);
       }
-        toast({
-          title: "Login Failed",
-          description: "Invalid email or password",
-          variant: "destructive"
-        });
+      toast({
+        title: "Login Failed",
+        description: "Invalid email or password",
+        variant: "destructive"
+      });
       
       // Implement exponential backoff (1, 2, 4, 8, 16 seconds)
       const backoffTime = Math.min(2 ** (loginAttempts - 1), 16) * 1000;
       setNextAttemptTime(Date.now() + backoffTime);
+      
+      return undefined; // Add explicit return for all code paths
     } finally {
       setIsLoading(false);
     }

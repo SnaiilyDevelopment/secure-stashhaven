@@ -206,7 +206,6 @@ const ThreeDBackground: React.FC<ThreeDBackgroundProps> = ({ color = '#10b981' }
     
     // Mouse interaction
     const mouse = new THREE.Vector2();
-    const windowHalf = new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2);
     
     const onMouseMove = (event: MouseEvent) => {
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -256,11 +255,11 @@ const ThreeDBackground: React.FC<ThreeDBackgroundProps> = ({ color = '#10b981' }
       }
       
       // Dispose geometries and materials
-      scene.traverse((object) => {
+      scene.traverse((object: THREE.Object3D) => {
         if (object instanceof THREE.Mesh) {
           object.geometry.dispose();
           if (Array.isArray(object.material)) {
-            object.material.forEach(material => material.dispose());
+            object.material.forEach((material: THREE.Material) => material.dispose());
           } else {
             object.material.dispose();
           }
