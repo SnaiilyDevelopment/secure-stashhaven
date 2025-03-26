@@ -1,6 +1,4 @@
-
 import { FormationFunction, FormationParams, Point, ParticleMode } from './types';
-// THREE import removed as it's not used directly in this file
 
 // Formation animations
 export const grid: FormationFunction = ({ particleCount, particleSize }: FormationParams) => {
@@ -147,6 +145,10 @@ export const scatter: FormationFunction = ({ particleCount, particleSize }: Form
   return { positions, colors };
 };
 
+// Import security icons formation
+import { securityIcons } from './SecurityIconsFormation';
+export { securityIcons };
+
 // Function to update particle target positions based on the selected formation
 export const updateTargetPositions = (particles: Point[], mode: ParticleMode): void => {
   if (!particles.length) return;
@@ -171,6 +173,9 @@ export const updateTargetPositions = (particles: Point[], mode: ParticleMode): v
       break;
     case 'scatter':
       formationData = scatter({ particleCount, particleSize });
+      break;
+    case 'security':
+      formationData = securityIcons({ particleCount, particleSize });
       break;
     default:
       // Use scatter as default for orbit or any unknown mode

@@ -11,7 +11,7 @@ export interface Point {
   lastUpdate: number;
 }
 
-export type ParticleMode = 'orbit' | 'wave' | 'scatter' | 'grid' | 'sphere' | 'spiral';
+export type ParticleMode = 'orbit' | 'wave' | 'scatter' | 'grid' | 'sphere' | 'spiral' | 'security';
 
 export interface BackgroundProps {
   color?: string;
