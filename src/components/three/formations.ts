@@ -1,6 +1,6 @@
 
 import { FormationFunction, FormationParams, Point, ParticleMode } from './types';
-import * as THREE from 'three';
+// THREE import removed as it's not used directly in this file
 
 // Formation animations
 export const grid: FormationFunction = ({ particleCount, particleSize }: FormationParams) => {
