@@ -11,7 +11,7 @@ export interface Point {
   lastUpdate: number;
 }
 
-export type ParticleMode = 'orbit' | 'wave' | 'scatter' | 'grid';
+export type ParticleMode = 'orbit' | 'wave' | 'scatter' | 'grid' | 'sphere' | 'spiral';
 
 export interface BackgroundProps {
   color?: string;
@@ -19,3 +19,15 @@ export interface BackgroundProps {
   mode?: ParticleMode;
   interactive?: boolean;
 }
+
+export interface FormationParams {
+  particleCount: number;
+  particleSize: number;
+}
+
+export interface FormationResult {
+  positions: number[];
+  colors: number[];
+}
+
+export type FormationFunction = (params: FormationParams) => FormationResult;
