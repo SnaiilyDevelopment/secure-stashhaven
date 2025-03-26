@@ -1,5 +1,5 @@
 
-import THREE from 'three';
+import * as THREE from 'three';
 import { Point, ParticleMode } from './types';
 
 export const createOrbitFormation = (particles: Point[]) => {
