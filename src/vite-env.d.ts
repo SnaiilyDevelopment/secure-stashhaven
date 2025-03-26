@@ -1,5 +1,4 @@
 
 /// <reference types="vite/client" />
 
-// Declare the three.js module
-declare module 'three';
+// No need to declare the three.js module since we're importing it properly now

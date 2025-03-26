@@ -1,5 +1,5 @@
 
-import * as THREE from 'three';
+import THREE from 'three';
 import { Point } from './types';
 
 export const calculateParticleCount = (density: number) => {

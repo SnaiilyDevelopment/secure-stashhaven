@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import THREE from 'three';
 import { BackgroundProps, Point, ParticleMode } from './types';
 import { initializeParticles, updateParticles } from './particleSystem';
 import { updateTargetPositions } from './formations';

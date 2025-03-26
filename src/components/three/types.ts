@@ -1,5 +1,5 @@
 
-import * as THREE from 'three';
+import THREE from 'three';
 
 export interface Point {
   position: THREE.Vector3;
