@@ -2,6 +2,8 @@
 import { toast } from "@/components/ui/use-toast";
 import { generateEncryptionKey } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthApiError } from "@supabase/supabase-js";
+import { getSessionKey, setSessionKey } from './keyStore';
 
 // Authentication errors that can be shown to users
 export enum AuthError {
@@ -79,23 +81,36 @@ const performAuthCheck = async (): Promise<AuthStatus> => {
     
     if (error) {
       console.error("Session check error:", error);
-      
-      // Determine error type for better error handling
-      if (error.message?.toLowerCase().includes('network') || 
-          error.message?.toLowerCase().includes('connection') ||
-          error.message?.toLowerCase().includes('failed to fetch')) {
+
+      // 1. Check for likely browser network errors first
+      if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+        console.log("Detected likely network error (TypeError: failed to fetch)");
         return {
           authenticated: false,
           error: AuthError.CONNECTION,
-          errorMessage: "Unable to connect to authentication service. Please check your internet connection.",
+          errorMessage: "Unable to connect. Please check your internet connection.",
           retryable: true
         };
       }
-      
+
+      // 2. Check for specific Supabase Auth API errors
+      if (error instanceof AuthApiError) {
+        console.log("Detected Supabase AuthApiError:", error.message);
+        // You could potentially check error.status here for more specific handling if needed
+        return {
+          authenticated: false,
+          error: AuthError.SESSION, // Treat specific API errors as session issues for now
+          errorMessage: `Session verification failed: ${error.message}`,
+          retryable: true // Often retryable, but depends on the specific error
+        };
+      }
+
+      // 3. Fallback for other unexpected errors during session check
+      console.log("Detected unexpected error during session check:", error);
       return {
         authenticated: false,
-        error: AuthError.SESSION,
-        errorMessage: error.message || "Session verification failed",
+        error: AuthError.SESSION, // Treat other errors as session issues
+        errorMessage: "Session verification failed due to an unexpected error.",
         retryable: true
       };
     }
@@ -105,61 +120,69 @@ const performAuthCheck = async (): Promise<AuthStatus> => {
       return { authenticated: false, retryable: false };
     }
     
+    /**
+     * Handles authentication checks specifically for OAuth providers (Google, GitHub).
+     * NOTE (Bug #3 - Inconsistent OAuth Key Handling):
+     * A robust solution for consistent encryption keys across password and OAuth logins
+     * requires backend involvement. The ideal approach involves:
+     * 1. Storing/deriving the user's master encryption key securely on the backend,
+     *    associated with their unique user ID, regardless of login method.
+     * 2. After successful authentication (password or OAuth), the backend provides
+     *    this key securely to the client (e.g., via a dedicated authenticated endpoint
+     *    or custom claim in the JWT).
+     *
+     * This client-side code CANNOT generate or guarantee the presence of the correct key
+     * for OAuth users without backend support. It checks if a key exists in memory
+     * (likely from a previous password login in the same session) but returns an
+     * AuthError.ENCRYPTION status if it's missing, signaling potential decryption issues
+     * to the application layer.
+     */
     // For OAuth users (Google/GitHub), we need special handling
     if (session.user?.app_metadata?.provider === 'github' || 
         session.user?.app_metadata?.provider === 'google') {
       
-      // If we don't have an encryption key yet, generate one
-      if (!localStorage.getItem('encryption_key')) {
-        console.log("OAuth user authenticated but no encryption key, generating one");
-        try {
-          const encryptionKey = await generateEncryptionKey();
-          localStorage.setItem('encryption_key', encryptionKey);
-        } catch (error) {
-          console.error("Error generating encryption key:", error);
-          return {
-            authenticated: false,
-            error: AuthError.ENCRYPTION,
-            errorMessage: "Failed to generate encryption key for OAuth login",
-            retryable: true
-          };
-        }
+      // OAuth user authenticated.
+      // WARNING: Client-side key generation removed. Consistent key management
+      // requires backend changes or prompting OAuth users for a password setup.
+      // For now, we assume a key *should* exist if the session is valid,
+      // but we don't generate one here. We rely on the key being set during
+      // a previous password login or fetched from a (currently non-existent) backend endpoint.
+      const hasEncryptionKey = !!getSessionKey();
+      if (!hasEncryptionKey) {
+         console.warn("OAuth user authenticated but no encryption key found in session memory. Data decryption may fail.");
+         // Depending on application logic, you might want to return an error or prompt the user.
+         // Returning authenticated: true for now, but highlighting the potential issue.
+         return {
+           authenticated: true, // Session is valid, but key state is uncertain
+           error: AuthError.ENCRYPTION, // Indicate potential key issue
+           errorMessage: "Secure session active, but encryption key missing. Some features may be unavailable.",
+           retryable: true // Re-login might fix it if key is derived/fetched then
+         };
       }
-      
-      console.log("OAuth user authenticated with encryption key");
+
+      console.log("OAuth user authenticated, encryption key found in session memory.");
       return { authenticated: true, retryable: false };
     }
     
-    // For email/password users, check both session and encryption key with error catching
-    try {
-      const hasEncryptionKey = !!localStorage.getItem('encryption_key');
-      console.log("Email user authenticated, encryption key present:", hasEncryptionKey);
-      
-      if (!hasEncryptionKey) {
-        console.log("No encryption key found, user not fully authenticated");
-        // Clear the session if we don't have an encryption key
-        await supabase.auth.signOut();
-        return {
-          authenticated: false,
-          error: AuthError.ENCRYPTION,
-          errorMessage: "Your encryption key is missing. Please login again to regenerate it.",
-          retryable: true
-        };
-      }
-      
-      return { authenticated: true, retryable: false };
-    } catch (error) {
-      if (error instanceof Error && error.name === 'SecurityError') {
-        console.error("Security error accessing localStorage:", error);
-        return {
-          authenticated: false,
-          error: AuthError.SECURITY,
-          errorMessage: "Browser security restrictions are preventing authentication. Try using a different browser or enable third-party cookies.",
-          retryable: true
-        };
-      }
-      throw error; // Re-throw other errors
+    // For email/password users, check both session and encryption key
+    const hasEncryptionKey = !!getSessionKey();
+    console.log("Email user session valid, encryption key present in memory:", hasEncryptionKey);
+
+    if (!hasEncryptionKey) {
+      console.warn("Email user session valid but no encryption key found in session memory. User needs to log in again.");
+      // Do NOT sign out here. Let the UI handle prompting for re-login.
+      // await supabase.auth.signOut(); // <-- REMOVED
+      return {
+        authenticated: false, // Session is valid, but key is missing for full functionality
+        error: AuthError.ENCRYPTION,
+        errorMessage: "Your secure session is incomplete. Please log in again to restore full access.", // Updated message
+        retryable: true // Re-login is the fix
+      };
     }
+
+    // Session is valid AND encryption key is present in memory
+    return { authenticated: true, retryable: false };
+    // Note: Removed the try/catch for SecurityError here as getSessionKey() doesn't access localStorage
   } catch (error) {
     console.error("Authentication check error in performAuthCheck:", error);
     throw error; // Re-throw to be caught by the outer function
@@ -199,5 +222,4 @@ export const handleAuthError = (authStatus: AuthStatus): void => {
 // Export the rest of the authentication functions
 export { registerUser, loginUser, signInWithProvider, logoutUser } from './userAuth';
 
-// Export getCurrentUserEncryptionKey from storage/fileOperations
-export { getCurrentUserEncryptionKey } from './userAuth';
+// Redundant export removed

@@ -8,40 +8,13 @@ import {
   zeroBuffer 
 } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
-
-// Maximum number of login attempts before rate limiting
-const MAX_LOGIN_ATTEMPTS = 5;
-// Time window for tracking attempts (milliseconds)
-const ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-
-// Store failed login attempts with timestamps
-const loginAttempts = new Map<string, number[]>();
+import { setSessionKey, clearSessionKey, getSessionKey } from './keyStore';
 
 // Login a user with email/password
 export const loginUser = async (email: string, password: string): Promise<boolean> => {
   try {
-    console.log("Attempting login for user:", email);
-    
-    // Check for rate limiting
-    const userAttempts = loginAttempts.get(email) || [];
-    const now = Date.now();
-    
-    // Filter attempts to only include those within the time window
-    const recentAttempts = userAttempts.filter(timestamp => (now - timestamp) < ATTEMPT_WINDOW_MS);
-    
-    if (recentAttempts.length >= MAX_LOGIN_ATTEMPTS) {
-      // Calculate time remaining in rate limit
-      const oldestAttempt = Math.min(...recentAttempts);
-      const timeRemaining = Math.ceil((oldestAttempt + ATTEMPT_WINDOW_MS - now) / 1000 / 60);
-      
-      toast({
-        title: "Too Many Login Attempts",
-        description: `Please try again in ${timeRemaining} minute${timeRemaining !== 1 ? 's' : ''}.`,
-        variant: "destructive"
-      });
-      
-      return false;
-    }
+    // console.log("Attempting login for user:", email);
+    const now = Date.now(); // Keep 'now' as it's used later for potential (though removed) tracking
     
     // Sign in with Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -51,11 +24,9 @@ export const loginUser = async (email: string, password: string): Promise<boolea
     
     // Handle authentication errors generically to prevent user enumeration
     if (error || !data.user) {
-      console.error("Login error:", error);
+      // console.error("Login error:", error);
       
-      // Track this failed attempt
-      recentAttempts.push(now);
-      loginAttempts.set(email, recentAttempts);
+      // Client-side attempt tracking removed
       
       // Use generic error message that doesn't confirm account existence
       toast({
@@ -71,7 +42,7 @@ export const loginUser = async (email: string, password: string): Promise<boolea
     const encryptedMasterKey = data.user.user_metadata.encryptedMasterKey;
     
     if (!salt || !encryptedMasterKey) {
-      console.error("Missing user metadata:", { salt, encryptedMasterKey });
+      // console.error("Missing user metadata:", { salt, encryptedMasterKey });
       
       toast({
         title: "Login failed",
@@ -86,32 +57,31 @@ export const loginUser = async (email: string, password: string): Promise<boolea
     }
     
     try {
-      // Derive key from password with user's salt
-      const passwordBytes = new TextEncoder().encode(password);
+      // Derive key directly from password string with user's salt.
+      // NOTE (Bug #4 - Incomplete Password Clearing): While we avoid storing the encoded
+      // password bytes longer than necessary, the original 'password' string itself
+      // cannot be reliably zeroed out in JavaScript due to string immutability.
+      // We minimize its scope here.
       const { key: derivedKey } = await deriveKeyFromPassword(password, salt);
-      
-      // Zero out password in memory
-      zeroBuffer(passwordBytes.buffer);
-      
+
+      // Removed zeroBuffer call on encoded bytes as the original string persists anyway.
+
       try {
         // Attempt to decrypt the master key (this will fail if password is wrong)
         const masterKeyBase64 = await decryptText(encryptedMasterKey, derivedKey);
         
         // Store encryption key
-        localStorage.setItem('encryption_key', masterKeyBase64);
+        setSessionKey(masterKeyBase64);
         
-        // Clear login attempts on successful login
-        loginAttempts.delete(email);
+        // Client-side attempt tracking removed
         
-        console.log("Login successful, encryption key stored");
+        // console.log("Login successful, encryption key stored");
         return true;
       } catch (error) {
         // Decryption failed - wrong password but authentication succeeded
-        console.error("Decryption failed:", error);
+        // console.error("Decryption failed:", error);
         
-        // Track this failed attempt
-        recentAttempts.push(now);
-        loginAttempts.set(email, recentAttempts);
+        // Client-side attempt tracking removed
         
         // Force sign out since decryption failed
         await supabase.auth.signOut();
@@ -125,11 +95,9 @@ export const loginUser = async (email: string, password: string): Promise<boolea
         return false;
       }
     } catch (error) {
-      console.error("Key derivation error:", error);
+      // console.error("Key derivation error:", error);
       
-      // Track this failed attempt
-      recentAttempts.push(now);
-      loginAttempts.set(email, recentAttempts);
+      // Client-side attempt tracking removed
       
       // Force sign out
       await supabase.auth.signOut();
@@ -143,7 +111,7 @@ export const loginUser = async (email: string, password: string): Promise<boolea
       return false;
     }
   } catch (error) {
-    console.error("Login error:", error);
+    // console.error("Login error:", error);
     
     toast({
       title: "Login failed",
@@ -158,17 +126,17 @@ export const loginUser = async (email: string, password: string): Promise<boolea
 // Log out the current user with secure cleanup
 export const logoutUser = async (): Promise<void> => {
   try {
-    console.log("Logging out user");
-    
-    // Clear sensitive data
-    localStorage.removeItem('encryption_key');
-    
+    // console.log("Logging out user");
+
+    // Clear sensitive data from memory
+    clearSessionKey();
+
     // Sign out from Supabase
     await supabase.auth.signOut();
     
-    console.log("User logged out successfully");
+    // console.log("User logged out successfully");
   } catch (error) {
-    console.error("Logout error:", error);
+    // console.error("Logout error:", error);
     
     toast({
       title: "Logout error",
@@ -257,13 +225,15 @@ export const registerUser = async (email: string, password: string, confirmPassw
       return false;
     }
     
-    // Generate a salt and derive a key from the password
-    const passwordBytes = new TextEncoder().encode(password);
+    // Generate a salt and derive a key directly from the password string.
+    // NOTE (Bug #4 - Incomplete Password Clearing): While we avoid storing the encoded
+    // password bytes longer than necessary, the original 'password' string itself
+    // cannot be reliably zeroed out in JavaScript due to string immutability.
+    // We minimize its scope here.
     const { key: derivedKey, salt } = await deriveKeyFromPassword(password);
-    
-    // Zero out password in memory
-    zeroBuffer(passwordBytes.buffer);
-    
+
+    // Removed zeroBuffer call on encoded bytes as the original string persists anyway.
+
     // Generate a random encryption master key
     const masterKeyBase64 = await generateEncryptionKey();
     
@@ -292,45 +262,42 @@ export const registerUser = async (email: string, password: string, confirmPassw
             variant: "destructive"
           });
         } else {
+          // Log the specific error for debugging purposes
+          // console.error("Supabase registration error (non-429):", error);
           toast({
             title: "Registration failed",
-            description: error.message,
+            // Use a generic message instead of leaking potential internal details
+            description: "Could not complete registration. Please check your details or try again later.",
             variant: "destructive"
           });
         }
         return false;
       }
-      
-      // Store encryption key
-      localStorage.setItem('encryption_key', masterKeyBase64);
-      
+
+      // Store encryption key in session memory
+      setSessionKey(masterKeyBase64);
+
       toast({
         title: "Registration successful",
         description: "Your secure vault has been created."
       });
       
       return true;
-    } catch (supabaseError: any) {
-      // Handle rate limiting or other network errors
-      console.error("Supabase registration error:", supabaseError);
-      
-      if (supabaseError.status === 429) {
-        toast({
-          title: "Too many registration attempts",
-          description: "Please wait a moment before trying again.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Registration failed",
-          description: "Network error. Please try again later.",
-          variant: "destructive"
-        });
-      }
+    } catch (supabaseError: unknown) {
+      // Handle potential errors during Supabase sign up (e.g., network issues, unexpected errors)
+      // The inner catch block (lines 256-274) handles specific signUp API errors like 429 or existing user more reliably.
+      // This outer catch is more for unexpected issues during the process.
+      console.error("Unexpected error during Supabase registration attempt:", supabaseError); // Keep detailed log for debugging
+
+      toast({
+        title: "Registration Failed",
+        description: "An unexpected error occurred during registration. Please try again later.", // Generic user message
+        variant: "destructive"
+      });
       return false;
     }
   } catch (error) {
-    console.error("Registration error:", error);
+    // console.error("Registration error:", error);
     
     toast({
       title: "Registration failed",
@@ -349,7 +316,10 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin
+       // Use a path relative to the origin to handle potential sub-path deployments.
+       // Assumes the redirect target is the root of the application deployment.
+       // Alternatively, use an environment variable for the base URL.
+       redirectTo: `${window.location.origin}${window.location.pathname}`
       }
     });
     
@@ -364,7 +334,7 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
     
     return true;
   } catch (error) {
-    console.error("OAuth login error:", error);
+    // console.error("OAuth login error:", error);
     toast({
       title: "Login failed",
       description: "An unexpected error occurred.",
@@ -376,5 +346,5 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
 
 // Get current user's encryption key
 export const getCurrentUserEncryptionKey = (): string | null => {
-  return localStorage.getItem('encryption_key');
+  return getSessionKey();
 };
