@@ -44,7 +44,7 @@ const Login = () => {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">
       {/* 3D Interactive Background */}
-      <ThreeDBackground color="#22c55e" />
+      <ThreeDBackground color="#22c55e" mode="sphere" />
       
       <div className="w-full max-w-md mx-auto relative z-10">
         <div className="mb-8 text-center">

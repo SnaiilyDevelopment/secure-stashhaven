@@ -34,8 +34,8 @@ export const isAuthenticated = async (): Promise<{
 }> => {
   try {
     // Simple check if there's a session key in memory
-    const { getSessionKey } = require('./keyStore');
-    const hasSessionKey = !!getSessionKey();
+    const sessionKey = getSessionKey();
+    const hasSessionKey = !!sessionKey;
     
     return {
       authenticated: hasSessionKey,
