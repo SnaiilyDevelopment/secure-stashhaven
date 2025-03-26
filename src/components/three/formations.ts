@@ -1,80 +1,91 @@
 
+import { FormationFunction, FormationParams } from './types';
 import * as THREE from 'three';
-import { Point, ParticleMode } from './types';
 
-export const createOrbitFormation = (particles: Point[]) => {
-  for (let i = 0; i < particles.length; i++) {
-    const particle = particles[i];
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 5 + Math.random() * 15;
-    const height = (Math.random() - 0.5) * 20;
+// Formation animations
+export const grid: FormationFunction = ({ particleCount, particleSize }: FormationParams) => {
+  const gridSize = Math.ceil(Math.cbrt(particleCount));
+  const spacing = particleSize * 3;
+  const offset = (gridSize * spacing) / 2;
+  
+  const positions = [];
+  const colors = [];
+  
+  let i = 0;
+  for (let x = 0; x < gridSize; x++) {
+    for (let y = 0; y < gridSize; y++) {
+      for (let z = 0; z < gridSize; z++) {
+        if (i < particleCount) {
+          positions.push(
+            x * spacing - offset,
+            y * spacing - offset,
+            z * spacing - offset
+          );
+          
+          colors.push(
+            0.5 + x / gridSize / 2,
+            0.5 + y / gridSize / 2,
+            0.5 + z / gridSize / 2
+          );
+          
+          i++;
+        }
+      }
+    }
+  }
+  
+  return { positions, colors };
+};
+
+// Additional formations...
+export const sphere: FormationFunction = ({ particleCount, particleSize }: FormationParams) => {
+  const positions = [];
+  const colors = [];
+  const radius = particleSize * 50;
+  
+  for (let i = 0; i < particleCount; i++) {
+    const phi = Math.acos(-1 + (2 * i) / particleCount);
+    const theta = Math.sqrt(particleCount * Math.PI) * phi;
     
-    particle.targetPosition.set(
-      Math.cos(angle) * radius,
-      height,
-      Math.sin(angle) * radius
+    positions.push(
+      radius * Math.cos(theta) * Math.sin(phi),
+      radius * Math.sin(theta) * Math.sin(phi),
+      radius * Math.cos(phi)
+    );
+    
+    colors.push(
+      0.5 + 0.5 * Math.sin(theta),
+      0.5 + 0.5 * Math.cos(phi),
+      0.5 + 0.5 * Math.sin(phi + theta)
     );
   }
+  
+  return { positions, colors };
 };
 
-export const createWaveFormation = (particles: Point[]) => {
-  const gridSize = Math.ceil(Math.sqrt(particles.length));
-  const spacing = 25 / gridSize;
+export const spiral: FormationFunction = ({ particleCount, particleSize }: FormationParams) => {
+  const positions = [];
+  const colors = [];
+  const radius = particleSize * 50;
+  const turns = 5;
   
-  for (let i = 0; i < particles.length; i++) {
-    const particle = particles[i];
-    const x = (i % gridSize - gridSize / 2) * spacing;
-    const z = (Math.floor(i / gridSize) - gridSize / 2) * spacing;
+  for (let i = 0; i < particleCount; i++) {
+    const t = i / particleCount;
+    const angle = turns * Math.PI * 2 * t;
+    const radialDistance = radius * t;
     
-    particle.targetPosition.set(
-      x,
-      Math.sin(x * 0.5) * 5 + Math.cos(z * 0.5) * 5,
-      z
+    positions.push(
+      radialDistance * Math.cos(angle),
+      i / particleCount * radius - radius / 2,
+      radialDistance * Math.sin(angle)
+    );
+    
+    colors.push(
+      0.5 + 0.5 * Math.sin(t * Math.PI * 2),
+      0.5 + 0.5 * Math.cos(t * Math.PI * 2),
+      0.5 + 0.5 * Math.sin(t * Math.PI * 4)
     );
   }
-};
-
-export const createScatterFormation = (particles: Point[]) => {
-  for (let i = 0; i < particles.length; i++) {
-    const particle = particles[i];
-    
-    particle.targetPosition.set(
-      (Math.random() - 0.5) * 40,
-      (Math.random() - 0.5) * 40,
-      (Math.random() - 0.5) * 40
-    );
-  }
-};
-
-export const createGridFormation = (particles: Point[]) => {
-  const gridSize = Math.ceil(Math.cbrt(particles.length));
-  const spacing = 20 / gridSize;
   
-  for (let i = 0; i < particles.length; i++) {
-    const particle = particles[i];
-    const x = (i % gridSize - gridSize / 2) * spacing;
-    const y = (Math.floor(i / gridSize) % gridSize - gridSize / 2) * spacing;
-    const z = (Math.floor(i / (gridSize * gridSize)) - gridSize / 2) * spacing;
-    
-    particle.targetPosition.set(x, y, z);
-  }
-};
-
-export const updateTargetPositions = (particles: Point[], mode: ParticleMode) => {
-  if (!particles.length) return;
-  
-  switch(mode) {
-    case 'orbit':
-      createOrbitFormation(particles);
-      break;
-    case 'wave':
-      createWaveFormation(particles);
-      break;
-    case 'scatter':
-      createScatterFormation(particles);
-      break;
-    case 'grid':
-      createGridFormation(particles);
-      break;
-  }
+  return { positions, colors };
 };

@@ -1,11 +1,9 @@
-
 import { toast } from "@/components/ui/use-toast";
 import { 
   deriveKeyFromPassword, 
   encryptText, 
   decryptText, 
-  generateEncryptionKey, 
-  zeroBuffer 
+  generateEncryptionKey
 } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
 import { setSessionKey, clearSessionKey, getSessionKey } from './keyStore';
@@ -14,7 +12,6 @@ import { setSessionKey, clearSessionKey, getSessionKey } from './keyStore';
 export const loginUser = async (email: string, password: string): Promise<boolean> => {
   try {
     // console.log("Attempting login for user:", email);
-    const now = Date.now(); // Keep 'now' as it's used later for potential (though removed) tracking
     
     // Sign in with Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -258,8 +255,6 @@ export const registerUser = async (email: string, password: string, confirmPassw
     // cannot be reliably zeroed out in JavaScript due to string immutability.
     // We minimize its scope here.
     const { key: derivedKey, salt } = await deriveKeyFromPassword(password);
-
-    // Removed zeroBuffer call on encoded bytes as the original string persists anyway.
 
     // Generate a random encryption master key
     const masterKeyBase64 = await generateEncryptionKey();
