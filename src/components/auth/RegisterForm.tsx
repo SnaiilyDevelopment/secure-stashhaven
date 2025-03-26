@@ -30,7 +30,6 @@ const RegisterForm: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Generate CAPTCHA on component mount
   useEffect(() => {
     generateCaptcha();
   }, []);
@@ -45,7 +44,6 @@ const RegisterForm: React.FC = () => {
     setUserCaptcha('');
   };
 
-  // Check password strength
   const PASSWORD_MIN_LENGTH = 12;
   const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/;
   const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -72,7 +70,6 @@ const RegisterForm: React.FC = () => {
   const validateEmail = (email: string): boolean => {
     if (!EMAIL_REGEX.test(email)) return false;
     
-    // Additional validation for disposable emails
     const disposableDomains = [
       'tempmail', 'mailinator', 'guerrillamail', 
       '10minutemail', 'throwawaymail', 'fakeinbox'
@@ -90,7 +87,6 @@ const RegisterForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate inputs with user feedback
     if (password !== confirmPassword) {
       toast({
         title: "Registration Failed",
@@ -144,6 +140,13 @@ const RegisterForm: React.FC = () => {
       if (success) {
         navigate('/dashboard');
       }
+    } catch (error) {
+      console.error("Registration error:", error);
+      toast({
+        title: "Registration Failed",
+        description: "An unexpected error occurred during registration",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }

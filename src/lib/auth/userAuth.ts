@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import { 
   deriveKeyFromPassword, 
@@ -157,7 +158,7 @@ const PASSWORD_CRITERIA = {
   requireSpecial: true
 };
 
-// Validate password strength
+// Validate password strength (client-side)
 export const validatePasswordStrength = (password: string): { 
   valid: boolean;
   errors: string[];
@@ -193,6 +194,7 @@ export const validatePasswordStrength = (password: string): {
 // Register a new user with email/password
 export const registerUser = async (email: string, password: string, confirmPassword: string): Promise<boolean> => {
   try {
+    // First perform client-side validation (defense in depth)
     // Validate email format
     if (!EMAIL_REGEX.test(email)) {
       toast({
@@ -219,6 +221,32 @@ export const registerUser = async (email: string, password: string, confirmPassw
       toast({
         title: "Passwords Don't Match",
         description: "The passwords you entered don't match.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // NEW CODE: Send validation request to the server-side Edge Function
+    try {
+      const response = await supabase.functions.invoke('validate-registration', {
+        body: { email, password, confirmPassword }
+      });
+
+      // Check for validation errors from server
+      if (!response.data.valid) {
+        const errors = response.data.errors || [];
+        toast({
+          title: "Registration Failed",
+          description: errors.length > 0 ? errors[0] : "Server validation failed.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Server-side validation error:", error);
+      toast({
+        title: "Registration Failed",
+        description: "Could not complete server-side validation. Please try again later.",
         variant: "destructive"
       });
       return false;
