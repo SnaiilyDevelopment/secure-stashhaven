@@ -1,3 +1,4 @@
+
 # Roo Doc: Brittle Error Parsing in userAuth.ts
 
 **Date:** 2025-03-26
@@ -18,11 +19,11 @@ The `BUG_REPORT.md` (Bug #5) noted brittle error message parsing in `userAuth.ts
 *   **Frameworks:** React, Supabase
 *   **TypeScript:** Yes
 
-## Solution Attempt
+## Solution
 
-Removed the string parsing logic within the outer `catch` block (lines 293-315). Simplified the logic to display a generic error message, relying on the inner `catch` block (handling the `supabase.auth.signUp` promise rejection) for more specific error handling like status code 429.
+Removed the brittle string parsing logic within the outer `catch` block (lines 293-315). Simplified the logic to display a generic error message, relying on the inner `catch` block (handling the `supabase.auth.signUp` promise rejection) for more specific error handling like status code 429.
 
-**Outcome:** Applied via `apply_diff`. Awaiting user confirmation.
+**Outcome:** Fixed. The code now uses more robust error handling instead of string parsing.
 
 ## Knowledge Gaps / RAG Updates
 

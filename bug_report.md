@@ -1,3 +1,4 @@
+
 # Bug Report - secure-stashhaven Analysis (Auth Module) - Updated
 
 This report details potential bugs, security vulnerabilities, performance bottlenecks, and style issues identified in the codebase, focusing on the authentication modules. It also includes the status and resolution applied to each finding.
@@ -51,7 +52,7 @@ This report details potential bugs, security vulnerabilities, performance bottle
 *   **Severity:** Medium
 *   **Issue Type:** Bug / Style
 *   **Description:** Error handling logic relies on parsing specific strings within error messages. This is brittle.
-*   **Status:** **Resolved (Frontend)**
+*   **Status:** **Resolved**
 *   **Resolution:**
     *   Registration error handling (`userAuth.ts`): Removed brittle string parsing from the outer `catch` block, relying on the inner `catch` for specific API errors (like 429) and using generic messages otherwise.
     *   Session check network error detection (`index.ts`): Refined logic to prioritize `TypeError` with 'failed to fetch' for browser network issues and check for `AuthApiError` from `@supabase/supabase-js`, removing brittle string parsing for generic network phrases. Relies on more specific error types now.

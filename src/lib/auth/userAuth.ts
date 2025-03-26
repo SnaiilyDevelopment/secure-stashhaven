@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import { 
   deriveKeyFromPassword, 
@@ -285,8 +284,6 @@ export const registerUser = async (email: string, password: string, confirmPassw
       return true;
     } catch (supabaseError: unknown) {
       // Handle potential errors during Supabase sign up (e.g., network issues, unexpected errors)
-      // The inner catch block (lines 256-274) handles specific signUp API errors like 429 or existing user more reliably.
-      // This outer catch is more for unexpected issues during the process.
       console.error("Unexpected error during Supabase registration attempt:", supabaseError); // Keep detailed log for debugging
 
       toast({
