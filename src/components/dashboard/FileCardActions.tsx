@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   DropdownMenu,
@@ -8,56 +9,57 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Download, Trash2, MoreVertical, Share2 } from 'lucide-react';
-import { deleteFile } from '@/lib/storage';
+import { downloadEncryptedFile, deleteFile } from '@/lib/storage';
 import { toast } from '@/components/ui/use-toast';
 import ShareFileDialog from './ShareFileDialog';
 
 interface FileCardActionsProps {
   filePath: string;
   fileName: string;
+  fileType: string;
   onDelete: () => void;
 }
 
 const FileCardActions: React.FC<FileCardActionsProps> = ({
   filePath,
   fileName,
+  fileType,
   onDelete
 }) => {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   const handleDownload = async () => {
-    try {
+    const decryptedBlob = await downloadEncryptedFile(filePath, fileName, fileType);
+    
+    if (decryptedBlob) {
+      // Create a URL for the blob
+      const url = URL.createObjectURL(decryptedBlob);
+      
+      // Create a link element
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      
+      // Click the link to trigger the download
+      a.click();
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
       toast({
-        title: "Download functionality",
-        description: "File download functionality is not fully implemented yet."
-      });
-      // TODO: Implement downloadEncryptedFile function
-    } catch (error) {
-      console.error("Download error:", error);
-      toast({
-        title: "Download failed",
-        description: "Failed to download or decrypt the file.",
-        variant: "destructive"
+        title: "Download complete",
+        description: `${fileName} has been decrypted and downloaded.`
       });
     }
   };
   
   const handleDelete = async () => {
     if (confirm(`Are you sure you want to delete ${fileName}?`)) {
-      try {
-        await deleteFile(filePath);
+      const success = await deleteFile(filePath);
+      if (success) {
         onDelete();
-        toast({
-          title: "File deleted",
-          description: `${fileName} has been deleted.`
-        });
-      } catch (error) {
-        console.error("Delete error:", error);
-        toast({
-          title: "Delete failed",
-          description: "An error occurred while deleting the file.",
-          variant: "destructive"
-        });
       }
     }
   };

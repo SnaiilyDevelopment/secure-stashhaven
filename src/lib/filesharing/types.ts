@@ -1,35 +1,54 @@
 
-/**
- * Types for file sharing functionality
- */
+import { User } from "@supabase/supabase-js";
 
+/**
+ * Interface for recipient data
+ */
+export interface FileRecipient {
+  id: string;
+  email: string;
+  permissions: 'view' | 'edit' | 'admin';
+  shared_at: string;
+}
+
+/**
+ * Interface for shared file data
+ */
 export interface SharedFile {
   id: string;
-  file_id: string;
   file_path: string;
   original_name: string;
   original_type: string;
   size: number;
-  permissions: string;
-  created_at: string;
-  recipient_email: string;
+  permissions: 'view' | 'edit' | 'admin';
+  shared_at: string;
   owner_email: string;
-  shared_by_user_id: string;
 }
-
-export interface FileRecipient {
-  share_id: string;
-  recipient_email: string;
-  permissions: string;
-  created_at: string;
-}
-
-// Permission types for shared files
-export type FilePermission = 'view' | 'edit' | 'admin';
 
 /**
- * Validates if a string is a valid permission value
+ * Interface for the profiles data from Supabase
  */
-export function isValidPermission(permission: string): permission is FilePermission {
+export interface Profile {
+  email: string;
+  id: string;
+  created_at?: string;
+}
+
+/**
+ * Interface for file share database table
+ */
+export interface FileShareTable {
+  id: string;
+  file_path: string;
+  owner_id: string;
+  recipient_id: string;
+  permissions: 'view' | 'edit' | 'admin';
+  created_at: string;
+}
+
+/**
+ * Utility function to validate permissions string
+ */
+export function isValidPermission(permission: string): permission is 'view' | 'edit' | 'admin' {
   return ['view', 'edit', 'admin'].includes(permission);
 }

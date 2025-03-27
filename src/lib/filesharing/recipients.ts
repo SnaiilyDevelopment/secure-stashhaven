@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { FileRecipient } from "./types";
-import { isValidPermission } from "./types";
+import { FileRecipient, isValidPermission } from "./types";
 
 /**
  * Get all users who have access to a file
@@ -33,10 +32,10 @@ export const getFileRecipients = async (filePath: string): Promise<FileRecipient
       const validPermission = isValidPermission(permission) ? permission : 'view';
       
       return {
-        share_id: item.share_id,
-        recipient_email: item.recipient_email,
+        id: item.share_id,
+        email: item.recipient_email,
         permissions: validPermission,
-        created_at: item.created_at || new Date().toISOString()
+        shared_at: item.created_at || new Date().toISOString()
       };
     });
     
@@ -60,7 +59,7 @@ export const removeFileAccess = async (shareId: string): Promise<boolean> => {
     }
     
     // Use RPC function to remove access
-    const { error } = await supabase
+    const { data, error } = await supabase
       .rpc('remove_file_access', { 
         share_id_param: shareId, 
         owner_id_param: user.id 
@@ -78,23 +77,3 @@ export const removeFileAccess = async (shareId: string): Promise<boolean> => {
     return false;
   }
 };
-
-export async function removeRecipient(fileId: string, email: string): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('file_shares')  // Changed from 'file_sharing' to 'file_shares'
-      .delete()
-      .eq('file_id', fileId)
-      .eq('recipient_email', email);
-    
-    if (error) {
-      console.error("Error removing file recipient:", error);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error("Error in removeRecipient:", error);
-    return false;
-  }
-}

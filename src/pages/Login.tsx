@@ -1,32 +1,125 @@
-import { useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LockKeyhole, RefreshCw, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AuthError } from '@/lib/auth';
+import { isAuthenticated, handleAuthError, AuthError, AuthStatus } from '@/lib/auth';
 import ThreeDBackground from '@/components/3DBackground';
 import LoginForm from '@/components/auth/LoginForm';
+import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/useAuth';
+
+const MAX_AUTH_ATTEMPTS = 3;
 
 const Login = () => {
   const navigate = useNavigate();
-  const { isLoading, isError, errorType, checkAuth, user } = useAuth();
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [authAttempts, setAuthAttempts] = useState(0);
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (user) {
-      navigate('/dashboard', { replace: true });
+  const checkAuth = async () => {
+    // Prevent excessive auth checks
+    if (authAttempts >= MAX_AUTH_ATTEMPTS) {
+      console.log(`Reached max auth attempts (${MAX_AUTH_ATTEMPTS}), skipping check`);
+      setCheckingAuth(false);
+      setAuthStatus({
+        authenticated: false,
+        error: AuthError.UNKNOWN,
+        errorMessage: "Too many authentication attempts. Please try logging in manually.",
+        retryable: false
+      });
+      return;
     }
-  }, [user, navigate]);
+
+    setAuthAttempts(prev => prev + 1);
+    
+    try {
+      setCheckingAuth(true);
+      console.log("Checking authentication status...");
+      
+      try {
+        // First check if we have a session and encryption key (fast path)
+        const { data: sessionData } = await supabase.auth.getSession();
+        const hasEncryptionKey = !!localStorage.getItem('encryption_key');
+        
+        if (sessionData.session && hasEncryptionKey) {
+          console.log("Session and encryption key found, redirecting to dashboard");
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+      } catch (e) {
+        console.error("Error in fast path session check:", e);
+        // Continue to full auth check
+      }
+      
+      // Fallback to enhanced authentication check with better error handling
+      const status = await isAuthenticated();
+      
+      if (status.error) {
+        console.error("Authentication error:", status.error, status.errorMessage);
+        setAuthStatus(status);
+        handleAuthError(status);
+      }
+      
+      if (status.authenticated) {
+        console.log("User authenticated via isAuthenticated(), redirecting to dashboard");
+        navigate('/dashboard', { replace: true });
+      } else {
+        console.log("User not authenticated, showing login page");
+      }
+    } catch (error) {
+      console.error("Authentication check failed:", error);
+      const errorStatus: AuthStatus = {
+        authenticated: false, 
+        error: AuthError.UNKNOWN,
+        errorMessage: error instanceof Error ? error.message : "Failed to check authentication status",
+        retryable: true
+      };
+      setAuthStatus(errorStatus);
+      handleAuthError(errorStatus);
+    } finally {
+      setCheckingAuth(false);
+    }
+  };
+
+  useEffect(() => {
+    // Set a short timeout to ensure the check doesn't hang
+    const authTimeout = setTimeout(() => {
+      if (checkingAuth) {
+        console.log("Auth check timed out, allowing login page to display");
+        setCheckingAuth(false);
+        setAuthStatus({
+          authenticated: false,
+          error: AuthError.TIMEOUT,
+          errorMessage: "Authentication check took too long. You can still try to log in.",
+          retryable: true
+        });
+      }
+    }, 2000);
+    
+    // Only check auth on initial load and retries, not on every render
+    if (retryCount > 0 || authAttempts === 0) {
+      checkAuth();
+    }
+    
+    return () => clearTimeout(authTimeout);
+  }, [navigate, retryCount]); // Added retryCount dependency to trigger recheck
 
   // Function to retry authentication
   const handleRetryAuth = () => {
-    checkAuth();
+    setRetryCount(prev => prev + 1);
+    setAuthStatus(null);
+    toast({
+      title: "Retrying Authentication",
+      description: "Checking your authentication status again...",
+    });
   };
 
   // Show a simple loading state while checking auth
-  if (isLoading) {
+  if (checkingAuth) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-green-50">
         <div className="text-center">
@@ -38,12 +131,12 @@ const Login = () => {
   }
 
   // Check for specific security errors that might be related to CORS
-  const hasBrowserSecurityError = errorType === AuthError.SECURITY;
+  const hasBrowserSecurityError = authStatus?.error === AuthError.SECURITY;
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">
-      {/* 3D Interactive Background with security icons */}
-      <ThreeDBackground color="#22c55e" mode="security" density={80} />
+      {/* 3D Interactive Background */}
+      <ThreeDBackground color="#22c55e" />
       
       <div className="w-full max-w-md mx-auto relative z-10">
         <div className="mb-8 text-center">
@@ -73,10 +166,10 @@ const Login = () => {
         )}
         
         {/* Show error alert with retry button if there's an auth error */}
-        {isError && errorType !== AuthError.SECURITY && (
+        {authStatus?.error && authStatus.retryable && !hasBrowserSecurityError && (
           <Alert variant="destructive" className="mb-4 backdrop-blur-sm bg-red-50/90 border-red-200">
             <AlertDescription className="flex items-center justify-between">
-              <span>There was a problem with authentication. Please try again.</span>
+              <span>{authStatus.errorMessage || "There was a problem with authentication. Please try again."}</span>
               <Button 
                 variant="outline" 
                 size="sm" 

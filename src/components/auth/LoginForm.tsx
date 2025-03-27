@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, KeyRound, ArrowRight, Loader2 } from 'lucide-react';
@@ -10,19 +11,14 @@ import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const PASSWORD_MIN_LENGTH = 12;
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/;
-const LOGIN_TIMEOUT = 8000; // 8 seconds
+const LOGIN_TIMEOUT = 15000; // 15 seconds
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isOAuthLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [loginAttempts, setLoginAttempts] = useState(0);
-  const [nextAttemptTime, setNextAttemptTime] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,42 +48,18 @@ const LoginForm: React.FC = () => {
           try {
             localStorage.removeItem('encryption_key');
           } catch (error) {
-            if (process.env.NODE_ENV === 'development') {
-              console.error("Error clearing encryption key from localStorage:", error);
-            }
+            console.error("Error clearing encryption key from localStorage:", error);
             // We can still proceed even if this fails
           }
         }
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error("Error clearing authentication:", error);
-        }
+        console.error("Error clearing authentication:", error);
       }
     };
     
     clearAuth();
   }, [location]);
   
-  const validatePassword = (password: string): boolean => {
-    if (!password) {
-      setPasswordError('Password is required');
-      return false;
-    }
-    
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      setPasswordError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
-      return false;
-    }
-    
-    if (!PASSWORD_REGEX.test(password)) {
-      setPasswordError('Password must contain uppercase, lowercase, number and special character');
-      return false;
-    }
-    
-    setPasswordError('');
-    return true;
-  };
-
   const validateEmail = (email: string): boolean => {
     if (!email) {
       setEmailError('Email is required');
@@ -116,38 +88,20 @@ const LoginForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clear password field immediately
-    setPassword('');
-    
-    // Validate inputs before submission
-    if (!validateEmail(email) || !validatePassword(password)) {
+    // Validate email before submission
+    if (!validateEmail(email)) {
       toast({
-        title: "Login Failed",
-        description: "Invalid email or password",
+        title: "Invalid Email",
+        description: emailError,
         variant: "destructive"
       });
       return;
     }
     
-    // Check if user needs to wait before next attempt
-    const now = Date.now();
-    if (now < nextAttemptTime) {
-      const secondsLeft = Math.ceil((nextAttemptTime - now) / 1000);
-      toast({
-        title: "Too Many Attempts",
-        description: `Please wait ${secondsLeft} second${secondsLeft !== 1 ? 's' : ''} before trying again.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsLoading(true);
     
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log("Attempting login for:", email);
-      }
-      setLoginAttempts(prev => prev + 1);
+      console.log("Attempting login for:", email);
       
       // Add a timeout to prevent hanging on login
       const loginPromise = loginUser(email, password);
@@ -167,15 +121,9 @@ const LoginForm: React.FC = () => {
               variant: "destructive"
             });
           } else {
-            let errorMsg = "Login failed. Please check your credentials and try again.";
-            if (error.message === "Login timed out") {
-              errorMsg = "Login took too long. Please check your connection and try again.";
-            } else if (error.message.includes("rate limit")) {
-              errorMsg = "Too many attempts. Please wait before trying again.";
-            }
             toast({
               title: "Login Failed",
-              description: errorMsg,
+              description: "The login process failed. Please try again.",
               variant: "destructive"
             });
           }
@@ -183,74 +131,27 @@ const LoginForm: React.FC = () => {
         });
       
       if (success) {
-        // Verify encryption key is actually stored before proceeding
-        let attempts = 0;
-        let timeoutId: NodeJS.Timeout | null = null;
+        // Show success toast
+        toast({
+          title: "Login Successful",
+          description: "Welcome back to your secure vault.",
+        });
         
-        const checkKey = async () => {
-          attempts++;
-          const key = localStorage.getItem('encryption_key');
-          if (key) {
-            // Clear any pending timeout
-            if (timeoutId) {
-              clearTimeout(timeoutId);
-              timeoutId = null;
-            }
-            
-            // Show success toast
-            toast({
-              title: "Login Successful",
-              description: "Welcome back to your secure vault.",
-            });
-            
-            if (process.env.NODE_ENV === 'development') {
-              console.log("Login successful, encryption key confirmed, redirecting to dashboard...");
-            }
-            navigate('/dashboard', { replace: true });
-          } else if (attempts < 5) {
-            timeoutId = setTimeout(checkKey, 200);
-          } else {
-            // Key never appeared - something went wrong
-            if (process.env.NODE_ENV === 'development') {
-              console.error("Encryption key not stored after login");
-            }
-            toast({
-              title: "Login Error",
-              description: "Failed to initialize security. Please try again.",
-              variant: "destructive"
-            });
-            await supabase.auth.signOut();
-          }
-        };
+        console.log("Login successful, redirecting to dashboard...");
         
-        // Start checking for key
-        await checkKey();
-        
-        // Cleanup function
-        return () => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-        };
+        // Force redirect with a small delay to ensure the auth state is updated
+        setTimeout(() => {
+          console.log("Executing redirect to dashboard");
+          navigate('/dashboard', { replace: true });
+        }, 800);
       }
-      
-      return undefined; // Add explicit return for all code paths
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error("Login error:", error);
-      }
+      console.error("Login error:", error);
       toast({
         title: "Login Failed",
-        description: "Invalid email or password",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive"
       });
-      
-      // Implement exponential backoff (1, 2, 4, 8, 16 seconds)
-      const backoffTime = Math.min(2 ** (loginAttempts - 1), 16) * 1000;
-      setNextAttemptTime(Date.now() + backoffTime);
-      
-      return undefined; // Add explicit return for all code paths
     } finally {
       setIsLoading(false);
     }
@@ -308,13 +209,10 @@ const LoginForm: React.FC = () => {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`pl-10 border-green-200 focus:ring-green-500 ${passwordError ? 'border-red-300' : ''}`}
+                className="pl-10 border-green-200 focus:ring-green-500"
                 required
               />
             </div>
-            {passwordError && (
-              <p className="text-sm text-red-500 mt-1">{passwordError}</p>
-            )}
           </div>
           <Button 
             type="submit" 

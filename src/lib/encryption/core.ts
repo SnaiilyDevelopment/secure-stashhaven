@@ -1,140 +1,111 @@
+
 /**
  * Core encryption utilities for end-to-end encryption
  * Implements secure encryption practices inspired by Matrix E2EE concepts
  */
 
-import crypto from 'crypto';
-
-// Function to generate a random encryption key (AES-256)
-export const generateEncryptionKey = async (): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    crypto.randomBytes(32, (err, buffer) => {
-      if (err) {
-        console.error("Key generation error:", err);
-        return reject(new Error("Failed to generate encryption key"));
-      }
-      const keyBase64 = buffer.toString('base64');
-      resolve(keyBase64);
-    });
-  });
-};
-
-// Function to derive an encryption key from a password using PBKDF2
-export const deriveKeyFromPassword = async (password: string, existingSalt?: string): Promise<{ key: CryptoKey, salt: string }> => {
-  const salt = existingSalt || crypto.randomBytes(16).toString('hex');
-  const passwordBytes = new TextEncoder().encode(password);
-  const saltBytes = new TextEncoder().encode(salt);
-
-  const keyMaterial = await window.crypto.subtle.importKey(
-    "raw",
-    passwordBytes,
-    { name: "PBKDF2" },
-    false,
-    ["deriveKey"]
-  );
-
-  const derivedKey = await window.crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: saltBytes,
-      iterations: 100000,
-      hash: "SHA-256"
-    },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"]
-  );
-
-  return { key: derivedKey, salt: salt };
-};
-
-// Function to encrypt text using AES-GCM
-export const encryptText = async (text: string, key: CryptoKey): Promise<string> => {
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const encodedText = new TextEncoder().encode(text);
-
-  const encrypted = await window.crypto.subtle.encrypt(
-    {
-      name: "AES-GCM",
-      iv: iv
-    },
-    key,
-    encodedText
-  );
-
-  const ivArray = Array.from(iv);
-  const encryptedArray = Array.from(new Uint8Array(encrypted));
-  const combinedArray = ivArray.concat(encryptedArray);
-  const combinedBuffer = new Uint8Array(combinedArray).buffer;
-
-  return arrayBufferToBase64(combinedBuffer);
-};
-
-// Function to decrypt text using AES-GCM
-export const decryptText = async (base64String: string, key: CryptoKey): Promise<string> => {
-  const combinedBuffer = base64ToArrayBuffer(base64String);
-  const combinedArray = new Uint8Array(combinedBuffer);
-  const iv = combinedArray.slice(0, 12);
-  const encrypted = combinedArray.slice(12);
-
-  const decrypted = await window.crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: iv
-    },
-    key,
-    encrypted
-  );
-
-  const decodedText = new TextDecoder().decode(decrypted);
-  return decodedText;
-};
-
-// Function to import an encryption key from a base64 string
-export const importEncryptionKey = async (keyBase64: string): Promise<CryptoKey> => {
-  const keyBuffer = base64ToArrayBuffer(keyBase64);
-  return window.crypto.subtle.importKey(
-    "raw",
-    keyBuffer,
-    { name: "AES-GCM" },
-    true,
-    ["encrypt", "decrypt"]
-  );
-};
-
-// Function to export an encryption key to a base64 string
-export const exportEncryptionKey = async (key: CryptoKey): Promise<string> => {
-  const keyBuffer = await window.crypto.subtle.exportKey("raw", key);
-  return arrayBufferToBase64(keyBuffer);
-};
-
-// Helper function to convert ArrayBuffer to Base64 string
-export function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = '';
+// Utility to convert ArrayBuffer to base64 string
+export const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-  return btoa(binary);
-}
+  return window.btoa(binary);
+};
 
-// Helper function to convert Base64 string to ArrayBuffer
-export function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary_string = window.atob(base64);
-  const len = binary_string.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary_string.charCodeAt(i);
+// Utility to convert base64 string to ArrayBuffer
+export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binaryString = window.atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes.buffer;
-}
+};
 
-// Securely zero out a buffer
-export const zeroBuffer = (buf: ArrayBuffer): void => {
-  const dataView = new DataView(buf);
-  for (let i = 0; i < buf.byteLength; i++) {
-    dataView.setUint8(i, 0);
+// Generate a secure encryption key
+export const generateEncryptionKey = async (): Promise<string> => {
+  const key = await window.crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+  
+  // Export the key to raw format
+  const exportedKey = await window.crypto.subtle.exportKey('raw', key);
+  
+  // Convert to base64 for storage
+  return arrayBufferToBase64(exportedKey);
+};
+
+// Import an existing encryption key
+export const importEncryptionKey = async (keyBase64: string): Promise<CryptoKey> => {
+  const keyData = base64ToArrayBuffer(keyBase64);
+  
+  return await window.crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+};
+
+// Get the current user's encryption key from localStorage
+export const getCurrentUserEncryptionKey = (): string | null => {
+  return localStorage.getItem('encryption_key');
+};
+
+// Generate a secure random password with improved entropy
+export const generateSecurePassword = (length = 20): string => {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_-+=<>?{}[]|:;,.';
+  const values = new Uint8Array(length);
+  window.crypto.getRandomValues(values);
+  
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += charset[values[i] % charset.length];
   }
+  
+  return password;
+};
+
+// Matrix-inspired key derivation with stronger parameters
+export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer | string): Promise<{ key: string, salt: string }> => {
+  // Generate a salt if one isn't provided
+  if (!salt) {
+    salt = window.crypto.getRandomValues(new Uint8Array(16));
+  } else if (typeof salt === 'string') {
+    salt = base64ToArrayBuffer(salt);
+  }
+  
+  // Derive a key using PBKDF2 with higher iteration count for better security
+  const keyMaterial = await window.crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  
+  const derivedKey = await window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 310000, // Increased from 100000 for stronger security
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+  
+  const exportedKey = await window.crypto.subtle.exportKey('raw', derivedKey);
+  
+  return {
+    key: arrayBufferToBase64(exportedKey),
+    salt: arrayBufferToBase64(salt)
+  };
 };

@@ -39,12 +39,12 @@ export const adaptSharedFileToFileItem = (file: SharedFile): FileItemAdapter => 
   return {
     id: file.id,
     name: file.original_name,
-    size: file.size || 0, // Add default value
+    size: file.size,
     type: file.original_type,
     encryptedType: 'application/encrypted',
-    dateAdded: file.created_at,
+    dateAdded: file.shared_at,
     encrypted: true,
     isShared: true,
-    owner: file.owner_email || 'Unknown'
+    owner: file.owner_email
   };
 };

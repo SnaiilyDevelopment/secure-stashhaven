@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { SharedFile } from "./types";
-import { isValidPermission } from "./types";
+import { SharedFile, isValidPermission } from "./types";
 
 /**
  * Get files shared with the current user
@@ -31,15 +30,12 @@ export const getFilesSharedWithMe = async (): Promise<SharedFile[]> => {
       
       return {
         id: item.share_id,
-        file_id: item.file_id || '',
         file_path: item.file_path || '',
         original_name: item.original_name || 'Unknown file',
         original_type: item.original_type || '',
         size: item.size || 0,
         permissions: validPermission,
-        created_at: item.created_at || '',
-        recipient_email: user.email || '',
-        shared_by_user_id: item.owner_id || '',
+        shared_at: item.created_at || '',
         owner_email: item.owner_email || 'Unknown owner'
       };
     });

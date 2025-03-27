@@ -1,6 +1,0 @@
-
-# project_id is read by default from the supabase/config.toml file
-project_id = "fonipsfmywlsrnlyiduf"
-
-[functions.validate-registration]
-verify_jwt = false

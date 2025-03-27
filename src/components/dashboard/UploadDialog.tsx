@@ -15,10 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { uploadFile } from '@/lib/storage';
+import { uploadEncryptedFile } from '@/lib/storage';
 import { ensureStorageBucket } from '@/lib/storage/storageUtils';
-import { useAuth } from '@/hooks/useAuth';
-import { toast } from '@/components/ui/use-toast';
 
 interface UploadDialogProps {
   open: boolean;
@@ -36,7 +34,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const BUCKET_NAME = 'secure-files';
-  const { user } = useAuth();
   
   // Ensure the storage bucket exists when dialog opens
   useEffect(() => {
@@ -60,11 +57,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       return;
     }
     
-    if (!user) {
-      setError("You must be logged in to upload files");
-      return;
-    }
-    
     setIsUploading(true);
     setProgress(0);
     setError(null);
@@ -78,25 +70,23 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         });
       }, 500);
       
-      // Upload the file
-      const fileMetadata = await uploadFile(selectedFile, user.id);
+      // Use uploadEncryptedFile to handle the upload
+      const filePath = await uploadEncryptedFile(selectedFile, BUCKET_NAME, undefined, (p) => {
+        if (p === 100) {
+          clearInterval(progressInterval);
+        }
+        setProgress(p);
+      });
       
-      // Update progress to 100% when upload is complete
       clearInterval(progressInterval);
       setProgress(100);
       
-      if (!fileMetadata) {
+      if (!filePath) {
         throw new Error("Upload failed");
       }
       
       // Reset the form after successful upload
       setSelectedFile(null);
-      
-      // Show success message
-      toast({
-        title: "File uploaded",
-        description: `${selectedFile.name} has been encrypted and uploaded.`
-      });
       
       // Close the dialog and refresh the file list
       setTimeout(() => {
@@ -104,9 +94,9 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         onUploadComplete();
       }, 500);
       
-    } catch (err: any) {
+    } catch (err) {
       console.error("File upload error:", err);
-      setError(err.message || "Failed to upload file. Please try again.");
+      setError("Failed to upload file. Please try again.");
     } finally {
       setIsUploading(false);
     }

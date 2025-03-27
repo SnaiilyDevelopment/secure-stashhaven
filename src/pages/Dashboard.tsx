@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilePlus } from 'lucide-react';
@@ -9,6 +8,7 @@ import { isAuthenticated, getCurrentUserEncryptionKey } from '@/lib/auth';
 import { encryptFile, decryptFile } from '@/lib/encryption';
 import SearchBar from '@/components/dashboard/SearchBar';
 import FileList from '@/components/dashboard/FileList';
+import { adaptFileMetadataToFileItem } from '@/lib/types';
 
 interface FileItem {
   id: string;
@@ -24,6 +24,7 @@ const Dashboard = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -230,17 +231,22 @@ const Dashboard = () => {
         </header>
         
         <FileList 
-          files={files.filter(file => 
-            file.name.toLowerCase().includes(searchQuery.toLowerCase())
-          )}
+          files={files.map(file => ({
+            id: file.id,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            encryptedType: file.encryptedType,
+            dateAdded: file.dateAdded,
+            encrypted: file.encrypted
+          }))}
+          searchQuery={searchQuery}
+          activeTab={activeTab}
           isLoading={isUploading}
-          onDeleteComplete={() => {
-            // This function will be called after file deletion
-            console.log('File deletion completed');
-          }}
+          setActiveTab={setActiveTab}
+          handleFileUpload={handleFileUpload}
           downloadFile={downloadFile}
           deleteFile={deleteFile}
-          emptyMessage="No files found. Upload your first encrypted file."
         />
       </div>
     </ThreeDLayout>

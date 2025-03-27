@@ -3,7 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Mail, Eye, Edit, Star, Loader2, Trash2 } from 'lucide-react';
-import { FileRecipient } from '@/lib/filesharing/types';
+import { FileRecipient } from '@/lib/filesharing';
 
 interface RecipientListProps {
   recipients: FileRecipient[];
@@ -52,12 +52,12 @@ const RecipientList: React.FC<RecipientListProps> = ({
     <div className="space-y-2 max-h-48 overflow-y-auto">
       {recipients.map((recipient) => (
         <div 
-          key={recipient.share_id} 
+          key={recipient.id} 
           className="flex items-center justify-between bg-secondary/50 p-2 rounded-md"
         >
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{recipient.recipient_email}</span>
+            <span className="text-sm">{recipient.email}</span>
             <Badge 
               variant="outline" 
               className="flex items-center gap-1 text-xs"
@@ -69,11 +69,11 @@ const RecipientList: React.FC<RecipientListProps> = ({
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => onRemoveAccess(recipient.share_id)}
-            disabled={isRemoving === recipient.share_id}
+            onClick={() => onRemoveAccess(recipient.id)}
+            disabled={isRemoving === recipient.id}
             title="Remove access"
           >
-            {isRemoving === recipient.share_id ? (
+            {isRemoving === recipient.id ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
