@@ -1,6 +1,7 @@
 import { toast } from "@/components/ui/use-toast";
 import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthError, AuthStatus } from "./types";
 
 // Login a user with email/password
 export const loginUser = async (email: string, password: string): Promise<boolean> => {
@@ -216,4 +217,101 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
 // Get current user's encryption key
 export const getCurrentUserEncryptionKey = (): string | null => {
   return localStorage.getItem('encryption_key');
+};
+
+// Check if user is authenticated
+export const isAuthenticated = async (): Promise<AuthStatus> => {
+  try {
+    console.log("Checking authentication status...");
+    
+    // Check session
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error("Session check error:", error);
+      return {
+        authenticated: false,
+        error: AuthError.NETWORK,
+        errorMessage: error.message,
+        retryable: true
+      };
+    }
+    
+    if (!data.session) {
+      console.log("No active session found");
+      return { authenticated: false };
+    }
+    
+    // Check if encryption key exists
+    const encryptionKey = localStorage.getItem('encryption_key');
+    if (!encryptionKey) {
+      console.error("No encryption key found");
+      return {
+        authenticated: false,
+        error: AuthError.MISSING_ENCRYPTION_KEY,
+        errorMessage: "No encryption key found. Please log in again.",
+        retryable: false
+      };
+    }
+    
+    console.log("User is authenticated");
+    return { authenticated: true };
+  } catch (error) {
+    console.error("Authentication check error:", error);
+    
+    // Determine error type
+    const errorType = error instanceof Error ? 
+      (error.message.includes('network') ? AuthError.NETWORK : AuthError.UNKNOWN) : 
+      AuthError.UNKNOWN;
+      
+    return {
+      authenticated: false,
+      error: errorType,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      retryable: errorType === AuthError.NETWORK || errorType === AuthError.TIMEOUT
+    };
+  }
+};
+
+// Handle authentication errors
+export const handleAuthError = (status: AuthStatus): void => {
+  if (!status.error || !status.errorMessage) return;
+  
+  switch (status.error) {
+    case AuthError.NETWORK:
+      toast({
+        title: "Network Error",
+        description: "Could not connect to authentication service. Please check your connection.",
+        variant: "destructive"
+      });
+      break;
+    case AuthError.TIMEOUT:
+      toast({
+        title: "Request Timeout",
+        description: "The authentication request timed out. Please try again.",
+        variant: "destructive"
+      });
+      break;
+    case AuthError.EXPIRED_SESSION:
+      toast({
+        title: "Session Expired",
+        description: "Your session has expired. Please log in again.",
+        variant: "destructive"
+      });
+      // Redirect to login page could be handled here or by the component
+      break;
+    case AuthError.MISSING_ENCRYPTION_KEY:
+      toast({
+        title: "Authentication Error",
+        description: "Your encryption key is missing. Please log in again to restore secure access.",
+        variant: "destructive"
+      });
+      break;
+    default:
+      toast({
+        title: "Authentication Error",
+        description: status.errorMessage || "An unknown error occurred.",
+        variant: "destructive"
+      });
+  }
 };
