@@ -14,7 +14,6 @@ export { grid, sphere, spiral, wave, scatter, securityIcons };
 export const updateTargetPositions = (
   particles: Point[],
   mode: ParticleMode,
-  speed: number = 0.1
 ): void => {
   // Calculate formation positions based on mode
   const count = particles.length;
