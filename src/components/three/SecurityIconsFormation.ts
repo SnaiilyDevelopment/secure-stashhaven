@@ -1,5 +1,4 @@
 
-import * as THREE from 'three';
 import { FormationFunction, FormationParams } from './types';
 
 // Formation that creates lock and key shapes
