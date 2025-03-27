@@ -1,4 +1,7 @@
+
 // Define the error types as an enum
+import { supabase } from '@/integrations/supabase/client';
+
 export enum AuthError {
   UNKNOWN = 'unknown',
   INVALID_CREDENTIALS = 'invalid_credentials',
