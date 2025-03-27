@@ -1,8 +1,7 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { isAuthenticated, AuthError, handleAuthError } from '@/lib/auth';
+import { AuthError, isAuthenticated, handleAuthError } from '@/lib/auth';
 import { toast } from '@/components/ui/use-toast';
 
 interface AuthContextType {
@@ -27,7 +26,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const MAX_AUTH_CHECKS = 3;
 
   const checkAuth = async () => {
-    // Prevent excessive auth checks
     if (authChecksCount >= MAX_AUTH_CHECKS) {
       console.log(`Reached max auth checks (${MAX_AUTH_CHECKS}), waiting for user action`);
       setIsLoading(false);
@@ -40,7 +38,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       console.log("Checking authentication status...");
       
-      // Fast path - check session directly first
       const { data } = await supabase.auth.getSession();
       const hasSession = !!data.session;
       const hasEncryptionKey = !!localStorage.getItem('encryption_key');
@@ -53,7 +50,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       
-      // Fallback to full auth check
       const authStatus = await isAuthenticated();
       
       if (authStatus.error) {
@@ -79,7 +75,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsError(true);
       setErrorType(AuthError.UNKNOWN);
       
-      // Show toast for unexpected errors
       toast({
         title: "Authentication Error",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -117,7 +112,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let isMounted = true;
     
-    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log("Auth state changed:", event, newSession ? "User logged in" : "No session");
@@ -128,7 +122,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setSession(newSession);
           setUser(newSession.user);
           
-          // For OAuth users, handle encryption key generation
           if (newSession.user?.app_metadata?.provider === 'github' || 
               newSession.user?.app_metadata?.provider === 'google') {
             if (!localStorage.getItem('encryption_key')) {
@@ -152,10 +145,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
     
-    // Initial session check
     checkAuth();
     
-    // Force loading to end if it's taking too long
     const forceReadyTimeout = setTimeout(() => {
       if (isMounted && isLoading) {
         console.log("Force ending loading state after timeout");

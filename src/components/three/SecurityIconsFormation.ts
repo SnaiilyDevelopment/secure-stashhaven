@@ -1,113 +1,109 @@
 
 import { FormationFunction, FormationParams } from './types';
+import * as THREE from 'three';
 
-// Formation that creates lock and key shapes
 export const securityIcons: FormationFunction = ({ particleCount, particleSize }: FormationParams) => {
   const positions = [];
   const colors = [];
   
-  // Calculate dimensions for proportional scaling
-  const scale = particleSize * 30;
-  const lockWidth = scale * 0.8;
-  const lockHeight = scale * 1.2;
-  const keyLength = scale * 1.5;
+  // Distribution parameters
+  const scaleFactor = particleSize * 120;
+  const centerClusterSize = particleCount * 0.4; // 40% for center cluster
+  const lockClusterSize = particleCount * 0.3; // 30% for lock shape
+  const keyClusterSize = particleCount * 0.2; // 20% for key shape
+  const scatterSize = particleCount * 0.1; // 10% for scattered particles
   
-  // Distribution control
-  const totalIcons = Math.min(particleCount, 800); // Limit max particles for performance
-  const lockParticles = Math.floor(totalIcons * 0.5); // 50% for lock
-  const keyParticles = Math.floor(totalIcons * 0.3); // 30% for key
-  const scatterParticles = totalIcons - lockParticles - keyParticles; // Remaining for scatter
-
-  // Create a padlock shape
-  for (let i = 0; i < lockParticles; i++) {
-    // Determine position on lock shape 
-    if (i < lockParticles * 0.6) {
-      // Lock body (rectangular part)
-      const t = i / (lockParticles * 0.6);
-      const row = Math.floor(t * 20);
-      const col = Math.floor((t * 20) % 10);
-      
-      positions.push(
-        (col / 10) * lockWidth - lockWidth/2,
-        -lockHeight/3 + (row / 20) * lockHeight,
-        (Math.random() - 0.5) * 0.2 * scale
-      );
-    } else {
-      // Lock shackle (curved top part)
-      const t = (i - lockParticles * 0.6) / (lockParticles * 0.4);
-      const angle = t * Math.PI;
-      
-      positions.push(
-        Math.sin(angle) * (lockWidth/2) * 0.8,
-        lockHeight/3 + Math.cos(angle) * (lockHeight/3),
-        (Math.random() - 0.5) * 0.2 * scale
-      );
-    }
+  // Create a center cluster
+  for (let i = 0; i < centerClusterSize; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const radius = 0.2 * Math.random() * scaleFactor;
     
-    // Green tones for lock
-    colors.push(
-      0.2 + Math.random() * 0.1, // R - low for green
-      0.7 + Math.random() * 0.3, // G - high for green
-      0.3 + Math.random() * 0.2  // B - medium for green tint
+    positions.push(
+      Math.cos(theta) * radius,
+      Math.sin(theta) * radius,
+      (Math.random() - 0.5) * radius * 0.5
     );
+    
+    colors.push(0.4, 0.8, 0.5); // Green-ish color
   }
-
-  // Create a key shape
-  const keyOffset = [scale * 1.5, -scale * 0.5, 0]; // Offset key from lock
-  for (let i = 0; i < keyParticles; i++) {
-    const t = i / keyParticles;
+  
+  // Create a lock shape
+  const lockCenter = new THREE.Vector3(scaleFactor * 0.4, 0, 0);
+  const lockRadius = scaleFactor * 0.15;
+  const lockBodyWidth = lockRadius * 1.2;
+  const lockBodyHeight = lockRadius * 2;
+  
+  for (let i = 0; i < lockClusterSize; i++) {
+    const isInBody = Math.random() > 0.4;
     
-    if (t < 0.3) {
-      // Key head (circular part)
-      const angle = t / 0.3 * Math.PI * 2;
+    if (isInBody) {
+      // Lock body (rectangle)
       positions.push(
-        Math.cos(angle) * (scale * 0.3) + keyOffset[0],
-        Math.sin(angle) * (scale * 0.3) + keyOffset[1],
-        (Math.random() - 0.5) * 0.2 * scale + keyOffset[2]
+        lockCenter.x + (Math.random() - 0.5) * lockBodyWidth,
+        lockCenter.y - lockRadius - Math.random() * lockBodyHeight,
+        lockCenter.z + (Math.random() - 0.5) * (lockBodyWidth * 0.5)
       );
     } else {
-      // Key shaft and teeth
-      const shaft = (t - 0.3) / 0.7;
-      const xPos = keyOffset[0] - shaft * keyLength;
-      
-      // Add teeth to key (only on bottom half)
-      let yPos = keyOffset[1];
-      if (shaft > 0.3 && shaft < 0.9) {
-        // Determine if this particle is a tooth
-        if (Math.random() > 0.7) {
-          yPos += (Math.random() - 0.5) * scale * 0.3;
-        }
-      }
-      
+      // Lock circle
+      const theta = Math.random() * Math.PI;
       positions.push(
-        xPos,
-        yPos,
-        (Math.random() - 0.5) * 0.2 * scale + keyOffset[2]
+        lockCenter.x + Math.cos(theta) * lockRadius,
+        lockCenter.y - Math.random() * 0.2 * lockRadius,
+        lockCenter.z + Math.sin(theta) * lockRadius
       );
     }
     
-    // Gold/yellow tones for key
-    colors.push(
-      0.8 + Math.random() * 0.2, // R - high for gold
-      0.7 + Math.random() * 0.3, // G - high for gold
-      0.2 + Math.random() * 0.1  // B - low for gold
-    );
+    colors.push(0.6, 0.9, 0.4); // Lighter green
+  }
+  
+  // Create a key shape
+  const keyCenter = new THREE.Vector3(-scaleFactor * 0.4, 0, 0);
+  const keyHeadRadius = scaleFactor * 0.12;
+  const keyLength = scaleFactor * 0.4;
+  
+  for (let i = 0; i < keyClusterSize; i++) {
+    const isInStem = Math.random() > 0.4;
+    
+    if (isInStem) {
+      // Key stem
+      positions.push(
+        keyCenter.x + Math.random() * keyLength,
+        keyCenter.y + (Math.random() - 0.5) * (keyHeadRadius * 0.5),
+        keyCenter.z + (Math.random() - 0.5) * (keyHeadRadius * 0.5)
+      );
+      
+      // Add teeth to the key
+      if (Math.random() > 0.7) {
+        positions.push(
+          keyCenter.x + Math.random() * keyLength,
+          keyCenter.y + keyHeadRadius * (Math.random() > 0.5 ? 0.6 : -0.6),
+          keyCenter.z + (Math.random() - 0.5) * (keyHeadRadius * 0.5)
+        );
+        
+        colors.push(0.7, 0.9, 0.5); // Lighter green for teeth
+      }
+    } else {
+      // Key head (circle)
+      const theta = Math.random() * Math.PI * 2;
+      positions.push(
+        keyCenter.x + Math.cos(theta) * keyHeadRadius,
+        keyCenter.y + Math.sin(theta) * keyHeadRadius,
+        keyCenter.z + (Math.random() - 0.5) * (keyHeadRadius * 0.3)
+      );
+    }
+    
+    colors.push(0.5, 0.85, 0.4); // Green color
   }
   
   // Add some scattered particles
-  for (let i = 0; i < scatterParticles; i++) {
+  for (let i = 0; i < scatterSize; i++) {
     positions.push(
-      (Math.random() - 0.5) * scale * 4,
-      (Math.random() - 0.5) * scale * 4,
-      (Math.random() - 0.5) * scale * 4
+      (Math.random() - 0.5) * scaleFactor,
+      (Math.random() - 0.5) * scaleFactor,
+      (Math.random() - 0.5) * scaleFactor
     );
     
-    // Green/teal security-themed colors
-    colors.push(
-      0.1 + Math.random() * 0.3, // R
-      0.6 + Math.random() * 0.4, // G
-      0.4 + Math.random() * 0.3  // B
-    );
+    colors.push(0.3 + Math.random() * 0.5, 0.7 + Math.random() * 0.3, 0.3 + Math.random() * 0.3);
   }
   
   return { positions, colors };
