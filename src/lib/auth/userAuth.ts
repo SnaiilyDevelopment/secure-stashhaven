@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import { deriveKeyFromPassword, encryptText, decryptText, generateEncryptionKey } from "../encryption";
 import { supabase } from "@/integrations/supabase/client";
@@ -259,15 +260,22 @@ export const isAuthenticated = async (): Promise<AuthStatus> => {
   } catch (error) {
     console.error("Authentication check error:", error);
     
-    // Determine error type
-    const errorType = error instanceof Error ? 
-      (error.message.includes('network') ? AuthError.NETWORK : AuthError.UNKNOWN) : 
-      AuthError.UNKNOWN;
+    // Determine error type and fix the type comparison
+    let errorType = AuthError.UNKNOWN;
+    
+    if (error instanceof Error) {
+      if (error.message.includes('network')) {
+        errorType = AuthError.NETWORK;
+      } else if (error.message.includes('timeout')) {
+        errorType = AuthError.TIMEOUT;
+      }
+    }
       
     return {
       authenticated: false,
       error: errorType,
       errorMessage: error instanceof Error ? error.message : String(error),
+      // Fix the comparison by checking each value individually
       retryable: errorType === AuthError.NETWORK || errorType === AuthError.TIMEOUT
     };
   }
