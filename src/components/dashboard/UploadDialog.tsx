@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -17,7 +16,7 @@ import { AlertCircle, Upload, Loader2, FileIcon, FileText } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { uploadEncryptedFile } from '@/lib/storage/fileOperations';
 import { ensureStorageBucket, getStorageQuota, formatBytes, validateFile } from '@/lib/storage/storageUtils';
-import { STORAGE_BUCKET_NAME, ALLOWED_FILE_TYPES } from '@/lib/storage/constants';
+import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
 
 interface UploadDialogProps {
   open: boolean;
@@ -48,15 +47,12 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     formattedAvailable: string;
   } | null>(null);
   
-  // Check for storage bucket and quota when dialog opens
   useEffect(() => {
     if (open) {
-      // Ensure storage bucket exists
       ensureStorageBucket(STORAGE_BUCKET_NAME).catch(err => {
         console.error("Failed to ensure bucket exists:", err);
       });
       
-      // Get storage quota
       getStorageQuota().then(quota => {
         setStorageQuota(quota);
       }).catch(err => {
@@ -70,7 +66,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       const file = e.target.files[0];
       setSelectedFile(file);
       
-      // Validate file type and size
       const validation = validateFile(file);
       setValidationStatus(validation);
       
@@ -79,7 +74,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       } else {
         setError(null);
         
-        // Check if file size exceeds available storage
         if (storageQuota && file.size > storageQuota.available) {
           setError(`Not enough storage space. You only have ${storageQuota.formattedAvailable} available.`);
         }
@@ -93,7 +87,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       return;
     }
     
-    // Double check storage quota
     const quota = await getStorageQuota();
     if (selectedFile.size > quota.available) {
       setError(`Not enough storage space. You only have ${quota.formattedAvailable} available.`);
@@ -105,7 +98,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     setError(null);
     
     try {
-      // Use uploadEncryptedFile to handle the upload
       const filePath = await uploadEncryptedFile(
         selectedFile, 
         STORAGE_BUCKET_NAME, 
@@ -117,15 +109,12 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         throw new Error("Upload failed");
       }
       
-      // Reset the form after successful upload
       setSelectedFile(null);
       
-      // Close the dialog and refresh the file list
       setTimeout(() => {
         onOpenChange(false);
         onUploadComplete();
       }, 500);
-      
     } catch (err) {
       console.error("File upload error:", err);
       setError("Failed to upload file. Please try again.");
@@ -134,7 +123,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     }
   };
   
-  // Get icon based on file type
   const getFileIcon = () => {
     if (!selectedFile) return null;
     
@@ -148,14 +136,8 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     }
   };
   
-  // List of supported file formats for display
   const getSupportedFormats = () => {
-    const formats = Object.keys(ALLOWED_FILE_TYPES);
-    const images = formats.filter(f => f.includes('image/')).length;
-    const documents = formats.filter(f => f.includes('application/')).length;
-    const text = formats.filter(f => f.includes('text/')).length;
-    
-    return `${images} image, ${documents} document, and ${text} text formats`;
+    return "All file types are supported";
   };
   
   return (
@@ -212,10 +194,9 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
               type="file" 
               onChange={handleFileChange} 
               disabled={isUploading}
-              accept={Object.keys(ALLOWED_FILE_TYPES).join(',')}
             />
             <p className="text-xs text-muted-foreground">
-              Supports {getSupportedFormats()}
+              {getSupportedFormats()}
             </p>
           </div>
           

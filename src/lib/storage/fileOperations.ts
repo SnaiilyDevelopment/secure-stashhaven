@@ -13,7 +13,7 @@ export const uploadEncryptedFile = async (
   onProgress?: (progress: number) => void
 ): Promise<string | null> => {
   try {
-    // Validate file type and size
+    // Validate file size only (type validation is skipped as we allow all types)
     const validation = validateFile(file);
     if (!validation.valid) {
       toast({
@@ -68,6 +68,17 @@ export const uploadEncryptedFile = async (
     
     if (error) {
       console.error("File upload error:", error);
+      
+      // Special case for bucket creation failure
+      if (error.message.includes("bucket") || error.status === 400) {
+        toast({
+          title: "Upload failed",
+          description: "Storage bucket issue. Please try again with a smaller file or contact support.",
+          variant: "destructive"
+        });
+        return null;
+      }
+      
       toast({
         title: "Upload failed",
         description: error.message,
@@ -77,7 +88,6 @@ export const uploadEncryptedFile = async (
     }
     
     // IMPORTANT: Create metadata entry for the file
-    // This was the main issue - ensure we're saving metadata
     try {
       const { error: metadataError } = await supabase
         .from('file_metadata')
@@ -85,7 +95,7 @@ export const uploadEncryptedFile = async (
           {
             file_path: data.path,
             original_name: file.name,
-            original_type: file.type,
+            original_type: file.type || 'application/octet-stream', // Default MIME type if none detected
             size: file.size,
             encrypted: true
           }

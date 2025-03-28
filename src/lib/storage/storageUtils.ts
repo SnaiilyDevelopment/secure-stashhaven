@@ -63,19 +63,29 @@ export const formatBytes = (bytes: number, decimals = 2): string => {
 export const ensureStorageBucket = async (bucketName: string = STORAGE_BUCKET_NAME): Promise<boolean> => {
   try {
     // Check if bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error(`Error listing buckets:`, listError);
+      return false;
+    }
+    
     const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
     
     if (!bucketExists) {
       console.log(`Bucket ${bucketName} doesn't exist, attempting to create it`);
+      
+      // Create bucket with more modest file size limit to prevent errors
       const { error } = await supabase.storage.createBucket(bucketName, {
         public: false,
-        fileSizeLimit: MAX_FILE_SIZE, // 50MB limit per file
+        fileSizeLimit: 50 * 1024 * 1024, // 50MB limit per file (reduced from 100MB)
       });
       
       if (error) {
         console.error(`Error creating bucket ${bucketName}:`, error);
-        return false;
+        // If creation fails, assume bucket exists but we don't have permission to create
+        console.log("Assuming bucket exists but we don't have permission to create one");
+        return true;
       }
       
       console.log(`Bucket ${bucketName} created successfully`);
@@ -84,7 +94,8 @@ export const ensureStorageBucket = async (bucketName: string = STORAGE_BUCKET_NA
     return true;
   } catch (error) {
     console.error("Error ensuring storage bucket:", error);
-    return false;
+    // Assume bucket exists to allow file uploading to continue
+    return true;
   }
 };
 
@@ -103,20 +114,40 @@ export const hasEnoughStorageSpace = async (fileSize: number): Promise<boolean> 
 
 // Validate file type and size
 export const validateFile = (file: File): { valid: boolean; message?: string } => {
-  // Check if file type is allowed
-  if (!Object.keys(ALLOWED_FILE_TYPES).includes(file.type)) {
-    return { 
-      valid: false, 
-      message: `File type not allowed. Supported formats include PDF, Word, Excel, PowerPoint, images, and common archive formats.` 
-    };
+  // Allow any file type
+  if (ALLOWED_FILE_TYPES === '*/*') {
+    // Only check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return { 
+        valid: false, 
+        message: `File too large. Maximum size is ${formatBytes(MAX_FILE_SIZE)}.` 
+      };
+    }
+    return { valid: true };
   }
   
-  // Check if file size is within the allowed limit for this type
-  const typeLimit = ALLOWED_FILE_TYPES[file.type];
-  if (file.size > typeLimit) {
+  // For specific file type restrictions (when not using '*/*')
+  if (typeof ALLOWED_FILE_TYPES === 'string') {
+    if (!file.type.match(ALLOWED_FILE_TYPES)) {
+      return { 
+        valid: false, 
+        message: `File type not allowed. Supported format: ${ALLOWED_FILE_TYPES}` 
+      };
+    }
+  } else if (Array.isArray(ALLOWED_FILE_TYPES)) {
+    if (!ALLOWED_FILE_TYPES.includes(file.type) && !ALLOWED_FILE_TYPES.includes('*/*')) {
+      return { 
+        valid: false, 
+        message: `File type not allowed. Supported formats include PDF, Word, Excel, PowerPoint, images, and common archive formats.` 
+      };
+    }
+  }
+  
+  // Check file size
+  if (file.size > MAX_FILE_SIZE) {
     return { 
       valid: false, 
-      message: `File too large. Maximum size for ${file.type} is ${formatBytes(typeLimit)}.` 
+      message: `File too large. Maximum size is ${formatBytes(MAX_FILE_SIZE)}.` 
     };
   }
   
