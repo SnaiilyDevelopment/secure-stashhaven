@@ -69,8 +69,8 @@ export const uploadEncryptedFile = async (
     if (error) {
       console.error("File upload error:", error);
       
-      // Special case for bucket creation failure
-      if (error.message.includes("bucket") || error.status === 400) {
+      // Special case for bucket creation failure - using error message check instead of status code
+      if (error.message.includes("bucket") || error.message.includes("row-level security policy")) {
         toast({
           title: "Upload failed",
           description: "Storage bucket issue. Please try again with a smaller file or contact support.",
