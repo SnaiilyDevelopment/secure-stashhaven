@@ -4,14 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
 import SearchBar from './SearchBar';
 import { FileItemAdapter, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/adapters/fileAdapter';
+import { FileMetadata } from '@/lib/storage';
 import { SharedFile } from '@/lib/filesharing';
 import { useSearch } from '@/hooks/useSearch';
 import { toast } from '@/components/ui/use-toast';
 import { AlertCircle } from 'lucide-react';
-import { FileItem } from './FileList';
 
 interface FilesSectionProps {
-  files: FileItem[];
+  files: FileMetadata[];
   sharedFiles: SharedFile[];
   isLoading: boolean;
   searchTerm: string;
@@ -59,21 +59,31 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     }
   };
   
-  // Filter files based on search term
+  // Filter files based on search term, using original_name property
   const filteredFiles = safeFilter(
     files, 
     searchTerm, 
-    (file) => file.name
+    (file) => file.original_name
   );
   
-  // Filter shared files based on search term
+  // Filter shared files based on search term, using original_name property
   const filteredSharedFiles = safeFilter(
     sharedFiles, 
     searchTerm, 
     (file) => file.original_name
   );
 
-  // Convert SharedFile to FileItem using our adapter with error handling
+  // Convert FileMetadata to FileItemAdapter using our adapter with error handling
+  const adaptedFiles = filteredFiles.map(file => {
+    try {
+      return adaptFileMetadataToFileItem(file);
+    } catch (error) {
+      console.error("Error adapting file metadata:", file, error);
+      return null;
+    }
+  }).filter(Boolean) as FileItemAdapter[];
+  
+  // Convert SharedFile to FileItemAdapter using our adapter with error handling
   const adaptedSharedFiles = filteredSharedFiles.map(file => {
     try {
       return adaptSharedFileToFileItem(file);
@@ -81,7 +91,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
       console.error("Error adapting shared file:", file, error);
       return null;
     }
-  }).filter(Boolean) as FileItem[];
+  }).filter(Boolean) as FileItemAdapter[];
 
   // If there's a filter error, show an error message
   if (filterError) {
@@ -120,7 +130,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
         
         <TabsContent value="my-files" className="mt-6">
           <FileList 
-            files={filteredFiles}
+            files={adaptedFiles}
             isLoading={isLoading}
             onDeleteComplete={onRefresh}
             emptyMessage="No files found. Upload your first encrypted file."

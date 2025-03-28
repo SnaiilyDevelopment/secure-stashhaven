@@ -4,15 +4,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FilesSection from './FilesSection';
 import FolderManager from './FolderManager';
 import { SharedFile } from '@/lib/filesharing';
+import { FileMetadata } from '@/lib/storage';
 import { getFilesSharedWithMe } from '@/lib/filesharing';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import UploadDialog from './UploadDialog';
-import { FileItem } from './FileList';
 
 interface DashboardContentProps {
-  files: FileItem[];
+  files: FileMetadata[];
   folders: string[];
   currentFolder: string | null;
   isLoading: boolean;

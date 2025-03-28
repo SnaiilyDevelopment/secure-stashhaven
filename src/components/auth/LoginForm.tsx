@@ -120,12 +120,6 @@ const LoginForm: React.FC = () => {
               description: "Your browser's security settings are preventing login. Try enabling third-party cookies or using a different browser.",
               variant: "destructive"
             });
-          } else if (error instanceof Error && error.message.includes('timeout')) {
-            toast({
-              title: "Login Timeout",
-              description: "The login process took too long. Please try again with a better connection.",
-              variant: "destructive"
-            });
           } else {
             toast({
               title: "Login Failed",

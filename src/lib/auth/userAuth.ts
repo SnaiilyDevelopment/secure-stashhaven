@@ -260,32 +260,23 @@ export const isAuthenticated = async (): Promise<AuthStatus> => {
   } catch (error) {
     console.error("Authentication check error:", error);
     
-    // Determine error type
+    // Determine error type and fix the type comparison
     let errorType = AuthError.UNKNOWN;
-    let errorMessage = "Unknown authentication error";
-    let retryable = false;
     
     if (error instanceof Error) {
-      errorMessage = error.message;
-      
-      if (error.message.includes('network') || error.message.includes('fetch')) {
+      if (error.message.includes('network')) {
         errorType = AuthError.NETWORK;
-        retryable = true;
       } else if (error.message.includes('timeout')) {
         errorType = AuthError.TIMEOUT;
-        retryable = true;
-      } else if (error.name === 'SecurityError') {
-        errorType = AuthError.SECURITY;
-        retryable = false;
-        errorMessage = "Browser security restrictions are preventing authentication. Please check your privacy settings.";
       }
     }
       
     return {
       authenticated: false,
       error: errorType,
-      errorMessage: errorMessage,
-      retryable: retryable
+      errorMessage: error instanceof Error ? error.message : String(error),
+      // Fix the comparison by checking each value individually
+      retryable: errorType === AuthError.NETWORK || errorType === AuthError.TIMEOUT
     };
   }
 };

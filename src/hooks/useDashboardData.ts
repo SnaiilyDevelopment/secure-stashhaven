@@ -26,7 +26,7 @@ export const useDashboardData = (initialLoad = true) => {
       console.log("Fetching files...");
       
       // Get files with retry mechanism
-      let fileData: FileItem[] = [];
+      let fileData = [];
       let retries = 0;
       const maxRetries = 2;
       
@@ -121,7 +121,7 @@ export const useDashboardData = (initialLoad = true) => {
       : true;
       
     const matchesFolder = currentFolder === null 
-      ? file.folder === undefined  
+      ? true 
       : file.folder === currentFolder;
       
     return matchesSearch && matchesFolder;

@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -108,30 +109,42 @@ const App = () => {
           
           if (!isMounted) return;
           
-          // For OAuth logins, generate and store encryption key when user first signs in
-          if (session && !localStorage.getItem('encryption_key') && 
-             (session.user?.app_metadata?.provider === 'github' || 
-              session.user?.app_metadata?.provider === 'google')) {
-            
-            console.log("OAuth login detected, generating encryption key");
-            try {
+          try {
+            // For OAuth logins, generate and store encryption key when user first signs in
+            if (session && !localStorage.getItem('encryption_key') && 
+                (session.user?.app_metadata?.provider === 'github' || 
+                session.user?.app_metadata?.provider === 'google')) {
+              
+              console.log("OAuth login detected, generating encryption key");
               // Create a random encryption key for OAuth users
-              const randomBytes = await window.crypto.getRandomValues(new Uint8Array(32));
-              const encryptionKey = btoa(String.fromCharCode(...randomBytes));
+              const encryptionKey = btoa(String.fromCharCode(
+                ...new Uint8Array(await window.crypto.getRandomValues(new Uint8Array(32)))
+              ));
               localStorage.setItem('encryption_key', encryptionKey);
-            } catch (error) {
-              console.error("Error generating encryption key:", error);
             }
+            
+            // Simple check if user is logged in based on session and encryption key
+            const authenticated = !!session && !!localStorage.getItem('encryption_key');
+            
+            console.log("User authenticated:", authenticated);
+            setIsLoggedIn(authenticated);
+            setIsCheckingAuth(false);
+            setIsReady(true);
+            setAuthStatus(null);
+          } catch (error) {
+            console.error("Error in auth state change handler:", error);
+            setIsReady(true);
+            setIsCheckingAuth(false);
+            setIsLoggedIn(false);
+            setAuthStatus({
+              authenticated: false,
+              error: error instanceof Error ? 
+                  (error.message.includes('network') ? 'connection_error' : 'unknown_error') as any : 
+                  'unknown_error' as any,
+              errorMessage: error instanceof Error ? error.message : String(error),
+              retryable: true
+            });
           }
-          
-          // Simple check if user is logged in based on session and encryption key
-          const authenticated = !!session && !!localStorage.getItem('encryption_key');
-          
-          console.log("User authenticated:", authenticated);
-          setIsLoggedIn(authenticated);
-          setIsCheckingAuth(false);
-          setIsReady(true);
-          setAuthStatus(null);
         });
         
         subscription = data.subscription;
@@ -143,7 +156,7 @@ const App = () => {
           setIsLoggedIn(false);
           setAuthStatus({
             authenticated: false,
-            error: AuthError.UNKNOWN,
+            error: 'unknown_error' as any,
             errorMessage: "Failed to initialize authentication system",
             retryable: true
           });
@@ -156,31 +169,50 @@ const App = () => {
       try {
         await setupAuthListener();
         
-        // Do a fast session check first
-        const { data: { session } } = await supabase.auth.getSession();
-        const hasEncryptionKey = !!localStorage.getItem('encryption_key');
+        // Initial session check with timeout - increased timeout to prevent issues
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Session check timed out")), AUTH_CHECK_FAST_TIMEOUT);
+        });
         
-        if (isMounted) {
-          if (session && hasEncryptionKey) {
-            setIsLoggedIn(true);
-            setAuthStatus(null);
-          } else {
-            setIsLoggedIn(false);
-          }
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise])
+          .catch(error => {
+            console.error("Session check timed out:", error);
+            return { data: { session: null }, error: new Error("Session check timed out") };
+          }) as any;
+        
+        if (!isMounted) return;
+        
+        if (error) {
+          console.error("Session check error:", error);
+          setAuthStatus({
+            authenticated: false,
+            error: 'session_error' as any,
+            errorMessage: error.message,
+            retryable: true
+          });
+          setIsLoggedIn(false);
+        } else {
+          // Simple check if user is logged in based on session and encryption key
+          const authenticated = !!session && !!localStorage.getItem('encryption_key');
           
-          setIsReady(true);
-          setIsCheckingAuth(false);
+          console.log("Initial auth check:", authenticated);
+          setIsLoggedIn(authenticated);
+          setAuthStatus(null);
         }
       } catch (error) {
         console.error("Auth check error:", error);
         if (isMounted) {
           setAuthStatus({
             authenticated: false,
-            error: AuthError.UNKNOWN,
+            error: 'unknown_error' as any,
             errorMessage: "Failed to check authentication status",
             retryable: true
           });
           setIsLoggedIn(false);
+        }
+      } finally {
+        if (isMounted) {
           setIsReady(true);
           setIsCheckingAuth(false);
         }
@@ -197,12 +229,12 @@ const App = () => {
         setIsCheckingAuth(false);
         setAuthStatus({
           authenticated: false,
-          error: AuthError.TIMEOUT,
+          error: 'timeout_error' as any,
           errorMessage: "Authentication check timed out. Please try logging in again.",
           retryable: true
         });
       }
-    }, AUTH_CHECK_TIMEOUT);
+    }, AUTH_CHECK_TIMEOUT); // Increased from 6000ms for better reliability
     
     // Cleanup subscription on unmount
     return () => {

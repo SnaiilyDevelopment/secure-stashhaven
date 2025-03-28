@@ -8,28 +8,14 @@ import { supabase } from '@/integrations/supabase/client';
 export const useAuthCheck = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<number>(Date.now());
-  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const navigate = useNavigate();
   
   // Check authentication
   const checkAuth = useCallback(async () => {
     try {
       setLastChecked(Date.now());
-      setIsCheckingAuth(true);
       console.log("Checking authentication status...");
       
-      // First, quickly check if we have both session and encryption key (fast path)
-      const { data } = await supabase.auth.getSession();
-      const hasEncryptionKey = !!localStorage.getItem('encryption_key');
-      
-      if (data.session && hasEncryptionKey) {
-        console.log("Session and encryption key found, authentication confirmed");
-        setAuthError(null);
-        setIsCheckingAuth(false);
-        return;
-      }
-      
-      // If fast path failed, do a more thorough check
       const authStatus = await isAuthenticated();
       
       if (!authStatus.authenticated) {
@@ -50,8 +36,6 @@ export const useAuthCheck = () => {
     } catch (error) {
       console.error("Auth check failed:", error);
       setAuthError("Authentication check failed. You can try refreshing the page.");
-    } finally {
-      setIsCheckingAuth(false);
     }
   }, [navigate]);
   
@@ -62,7 +46,6 @@ export const useAuthCheck = () => {
     // Set up auth state listener to handle events like token expiration
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth state changed:", event);
-      
       if (event === 'SIGNED_OUT') {
         navigate('/login');
       } else if (event === 'TOKEN_REFRESHED') {
@@ -93,5 +76,5 @@ export const useAuthCheck = () => {
     checkAuth();
   };
   
-  return { authError, handleRetry, isCheckingAuth };
+  return { authError, handleRetry };
 };

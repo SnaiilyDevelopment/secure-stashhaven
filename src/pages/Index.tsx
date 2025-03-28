@@ -5,7 +5,6 @@ import { isAuthenticated } from '@/lib/auth';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { AUTH_CHECK_TIMEOUT } from '@/lib/storage/constants';
-import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -19,30 +18,20 @@ const Index = () => {
         setLoading(true);
         setError(null);
         
-        // First try a fast check using the session and encryption key (fast path)
-        const { data: sessionData } = await supabase.auth.getSession();
-        const hasEncryptionKey = !!localStorage.getItem('encryption_key');
-        
-        if (sessionData.session && hasEncryptionKey) {
-          console.log("Session and encryption key found, redirecting to dashboard");
-          navigate('/dashboard');
-          return;
-        }
-        
         // Add timeout to prevent hanging - increased timeout
         const authCheckPromise = isAuthenticated();
         const timeoutPromise = new Promise<boolean>((_, reject) => {
           setTimeout(() => reject(new Error("Authentication check timed out")), AUTH_CHECK_TIMEOUT);
         });
         
-        const authStatus = await Promise.race([authCheckPromise, timeoutPromise])
+        const authenticated = await Promise.race([authCheckPromise, timeoutPromise])
           .catch(error => {
             console.error("Auth check timed out:", error);
             setError("Authentication check timed out. Redirecting to login...");
-            return { authenticated: false };
+            return false;
           });
         
-        if (authStatus.authenticated) {
+        if (authenticated) {
           navigate('/dashboard');
         } else {
           navigate('/login');
