@@ -62,6 +62,8 @@ const Dashboard = () => {
         />
         
         <DashboardHeader
+          title="Your Secure Files"
+          subtitle={`You have ${filteredFiles.length} file${filteredFiles.length !== 1 ? 's' : ''} in your vault`}
           storageUsed={storageUsed}
         />
         
