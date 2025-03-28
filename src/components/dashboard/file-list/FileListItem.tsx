@@ -2,7 +2,7 @@
 import React from 'react';
 import { TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download, Trash2, Lock } from 'lucide-react';
+import { Download, Trash2, Lock, Share2 } from 'lucide-react';
 import { formatBytes } from '@/lib/storage/storageUtils';
 import { FileItem } from '../FileList';
 import FileTypeIcon from './FileTypeIcon';
@@ -12,18 +12,35 @@ interface FileListItemProps {
   onDownload?: (id: string, filePath: string, name: string, type: string) => void;
   onDelete?: (id: string, filePath: string) => void;
   onDeleteComplete?: () => void;
+  onShare?: (id: string) => void;
 }
 
 const FileListItem: React.FC<FileListItemProps> = ({ 
   file, 
   onDownload, 
   onDelete,
-  onDeleteComplete
+  onDeleteComplete,
+  onShare
 }) => {
   const handleDelete = () => {
     if (confirm(`Are you sure you want to delete ${file.name}?`)) {
       onDelete?.(file.id, file.filePath);
       onDeleteComplete?.();
+    }
+  };
+
+  // Format date properly
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "Unknown date";
+      }
+      return date.toLocaleDateString();
+    } catch (e) {
+      console.error("Invalid date:", dateString, e);
+      return "Unknown date";
     }
   };
 
@@ -39,7 +56,7 @@ const FileListItem: React.FC<FileListItemProps> = ({
         </div>
       </TableCell>
       <TableCell>{formatBytes(file.size)}</TableCell>
-      <TableCell>{new Date(file.dateAdded).toLocaleDateString()}</TableCell>
+      <TableCell>{formatDate(file.dateAdded)}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           {onDownload && (
@@ -51,6 +68,18 @@ const FileListItem: React.FC<FileListItemProps> = ({
             >
               <Download className="h-4 w-4" />
               <span className="sr-only">Download</span>
+            </Button>
+          )}
+          
+          {onShare && !file.isShared && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => onShare(file.id)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Share2 className="h-4 w-4" />
+              <span className="sr-only">Share</span>
             </Button>
           )}
           

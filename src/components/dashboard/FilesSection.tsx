@@ -3,12 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
 import SearchBar from './SearchBar';
-import { FileItemAdapter, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/adapters/fileAdapter';
 import { FileMetadata } from '@/lib/storage';
 import { SharedFile } from '@/lib/filesharing';
 import { useSearch } from '@/hooks/useSearch';
 import { toast } from '@/components/ui/use-toast';
 import { AlertCircle } from 'lucide-react';
+import { FileItem } from './FileList';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -73,25 +73,44 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     (file) => file.original_name
   );
 
-  // Convert FileMetadata to FileItemAdapter using our adapter with error handling
+  // Convert FileMetadata to FileItem using correct properties
   const adaptedFiles = filteredFiles.map(file => {
     try {
-      return adaptFileMetadataToFileItem(file);
+      return {
+        id: file.id,
+        name: file.original_name,
+        size: file.size,
+        type: file.original_type,
+        dateAdded: file.created_at,
+        encrypted: file.encrypted,
+        filePath: file.file_path,
+        folder: file.file_path.includes('/') ? file.file_path.split('/')[0] : undefined
+      } as FileItem;
     } catch (error) {
       console.error("Error adapting file metadata:", file, error);
       return null;
     }
-  }).filter(Boolean) as FileItemAdapter[];
+  }).filter(Boolean) as FileItem[];
   
-  // Convert SharedFile to FileItemAdapter using our adapter with error handling
+  // Convert SharedFile to FileItem using correct properties
   const adaptedSharedFiles = filteredSharedFiles.map(file => {
     try {
-      return adaptSharedFileToFileItem(file);
+      return {
+        id: file.id,
+        name: file.original_name,
+        size: file.size,
+        type: file.original_type,
+        dateAdded: file.shared_at,
+        encrypted: true,
+        filePath: file.file_path,
+        isShared: true,
+        owner: file.owner_email
+      } as FileItem;
     } catch (error) {
       console.error("Error adapting shared file:", file, error);
       return null;
     }
-  }).filter(Boolean) as FileItemAdapter[];
+  }).filter(Boolean) as FileItem[];
 
   // If there's a filter error, show an error message
   if (filterError) {

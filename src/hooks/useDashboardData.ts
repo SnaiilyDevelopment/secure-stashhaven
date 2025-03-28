@@ -1,20 +1,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { listFiles } from '@/lib/storage/fileOperations';
+import { listUserFiles, FileMetadata } from '@/lib/storage';
 import { toast } from '@/components/ui/use-toast';
-import { FileItem } from '@/components/dashboard/FileList';
-
-export interface DashboardState {
-  files: FileItem[];
-  filteredFiles: FileItem[];
-  folders: string[];
-  currentFolder: string | null;
-  isLoading: boolean;
-  searchQuery: string;
-}
+import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
 
 export const useDashboardData = (initialLoad = true) => {
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<FileMetadata[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,46 +17,34 @@ export const useDashboardData = (initialLoad = true) => {
       console.log("Fetching files...");
       
       // Get files with retry mechanism
-      let fileData = [];
+      let fileData: FileMetadata[] = [];
       let retries = 0;
       const maxRetries = 2;
       
       while (retries <= maxRetries) {
         try {
-          const rawFiles = await listFiles();
-          console.log("Files fetched:", rawFiles);
+          // Use listUserFiles from the storage module
+          fileData = await listUserFiles(STORAGE_BUCKET_NAME);
+          console.log("Files fetched:", fileData);
           
           // Process files to extract folder information
           const extractedFolders = new Set<string>();
           
-          fileData = rawFiles.map(file => {
+          fileData.forEach(file => {
             // Check if the filename contains folder information (e.g., "folder/filename.ext")
             const filePath = file.file_path;
             const pathParts = filePath.split('/');
-            let folder: string | undefined = undefined;
             
             // If we have a path like "folder/file.txt"
             if (pathParts.length > 1 && pathParts[0] !== '') {
-              folder = pathParts[0];
-              extractedFolders.add(folder);
+              extractedFolders.add(pathParts[0]);
             }
-            
-            return {
-              id: file.id,
-              name: file.original_name,
-              size: file.size,
-              type: file.original_type,
-              dateAdded: file.created_at,
-              encrypted: file.encrypted,
-              filePath: file.file_path,
-              folder
-            };
           });
           
           // Update folders list
           setFolders(Array.from(extractedFolders));
-          
           break; // Exit loop if successful
+          
         } catch (error) {
           console.error(`Error fetching files (attempt ${retries + 1}/${maxRetries + 1}):`, error);
           retries++;
@@ -117,12 +96,12 @@ export const useDashboardData = (initialLoad = true) => {
   // Filter files based on search query and current folder
   const filteredFiles = files.filter(file => {
     const matchesSearch = searchQuery 
-      ? file.name.toLowerCase().includes(searchQuery.toLowerCase())
+      ? file.original_name.toLowerCase().includes(searchQuery.toLowerCase())
       : true;
       
     const matchesFolder = currentFolder === null 
-      ? true 
-      : file.folder === currentFolder;
+      ? file.file_path.indexOf('/') === -1 // Files not in folders
+      : file.file_path.startsWith(`${currentFolder}/`); // Files in the selected folder
       
     return matchesSearch && matchesFolder;
   });
