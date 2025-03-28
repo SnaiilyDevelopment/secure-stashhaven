@@ -2,15 +2,39 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { encryptFile, decryptFile, getCurrentUserEncryptionKey } from "../encryption";
+import { hasEnoughStorageSpace, validateFile } from "./storageUtils";
+import { STORAGE_BUCKET_NAME } from "./constants";
 
 // Upload an encrypted file to Supabase storage
 export const uploadEncryptedFile = async (
   file: File,
-  bucketName: string = 'secure-files',
+  bucketName: string = STORAGE_BUCKET_NAME,
   path?: string,
   onProgress?: (progress: number) => void
 ): Promise<string | null> => {
   try {
+    // Validate file type and size
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      toast({
+        title: "Upload failed",
+        description: validation.message,
+        variant: "destructive"
+      });
+      return null;
+    }
+    
+    // Check if user has enough storage space
+    const hasSpace = await hasEnoughStorageSpace(file.size);
+    if (!hasSpace) {
+      toast({
+        title: "Upload failed",
+        description: "You've reached your storage limit. Please delete some files before uploading more.",
+        variant: "destructive"
+      });
+      return null;
+    }
+    
     onProgress?.(10); // Starting encryption
     
     const encryptionKey = getCurrentUserEncryptionKey();
@@ -37,9 +61,13 @@ export const uploadEncryptedFile = async (
         cacheControl: '3600',
         upsert: false,
         contentType: 'application/encrypted',
+        onUploadProgress: (progress) => {
+          // Map the progress from 40-80%
+          const uploadProgressPercent = progress.percent || 0;
+          const overallProgress = 40 + (uploadProgressPercent * 0.4);
+          onProgress?.(overallProgress);
+        },
       });
-    
-    onProgress?.(80); // Upload complete
     
     if (error) {
       console.error("File upload error:", error);
@@ -50,6 +78,8 @@ export const uploadEncryptedFile = async (
       });
       return null;
     }
+    
+    onProgress?.(80); // Upload complete
     
     // Save metadata to user's file list
     try {
@@ -94,9 +124,12 @@ export const downloadEncryptedFile = async (
   filePath: string,
   originalName: string,
   originalType: string,
-  bucketName: string = 'secure-files'
+  bucketName: string = STORAGE_BUCKET_NAME,
+  onProgress?: (progress: number) => void
 ): Promise<Blob | null> => {
   try {
+    onProgress?.(10); // Starting download
+    
     const encryptionKey = getCurrentUserEncryptionKey();
     if (!encryptionKey) {
       toast({
@@ -122,8 +155,17 @@ export const downloadEncryptedFile = async (
       return null;
     }
     
+    onProgress?.(50); // Download complete, starting decryption
+    
     // Decrypt the file
     const decryptedBlob = await decryptFile(data, encryptionKey, originalType);
+    
+    onProgress?.(100); // Process complete
+    
+    toast({
+      title: "Download complete",
+      description: `${originalName} has been decrypted and is ready to save.`
+    });
     
     return decryptedBlob;
   } catch (error) {
@@ -140,7 +182,7 @@ export const downloadEncryptedFile = async (
 // Delete a file from Supabase storage
 export const deleteFile = async (
   filePath: string,
-  bucketName: string = 'secure-files'
+  bucketName: string = STORAGE_BUCKET_NAME
 ): Promise<boolean> => {
   try {
     // Delete file from storage
@@ -186,5 +228,30 @@ export const deleteFile = async (
       variant: "destructive"
     });
     return false;
+  }
+};
+
+// List all files
+export const listFiles = async (): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('file_metadata')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error("Error listing files:", error);
+      toast({
+        title: "Error",
+        description: "Could not retrieve your files.",
+        variant: "destructive"
+      });
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error listing files:", error);
+    return [];
   }
 };

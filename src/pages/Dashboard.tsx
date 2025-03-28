@@ -1,253 +1,160 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FilePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import ThreeDLayout from '@/components/layout/3DLayout';
-import { isAuthenticated, getCurrentUserEncryptionKey } from '@/lib/auth';
-import { encryptFile, decryptFile } from '@/lib/encryption';
-import SearchBar from '@/components/dashboard/SearchBar';
+import { isAuthenticated } from '@/lib/auth';
 import FileList from '@/components/dashboard/FileList';
-import { adaptFileMetadataToFileItem } from '@/lib/types';
-
-interface FileItem {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  encryptedType: string;
-  dateAdded: string;
-  encrypted: boolean;
-}
+import FileListHeader from '@/components/dashboard/FileListHeader';
+import StorageUsageDisplay from '@/components/dashboard/StorageUsageDisplay';
+import { listFiles, downloadEncryptedFile, deleteFile } from '@/lib/storage/fileOperations';
+import { getUserStorageUsage } from '@/lib/storage/storageUtils';
 
 const Dashboard = () => {
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [storageUsage, setStorageUsage] = useState({ totalSize: 0, fileCount: 0, limit: 0 });
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/login');
-      return;
-    }
-    
-    const loadFiles = () => {
-      try {
-        const savedFiles = localStorage.getItem('encrypted_files');
-        if (savedFiles) {
-          setFiles(JSON.parse(savedFiles));
-        }
-      } catch (error) {
-        console.error('Error loading files:', error);
+    // Check authentication
+    const checkAuth = async () => {
+      const authStatus = await isAuthenticated();
+      if (!authStatus.authenticated) {
+        navigate('/login');
       }
     };
     
-    loadFiles();
+    checkAuth();
   }, [navigate]);
   
-  const saveFiles = (updatedFiles: FileItem[]) => {
-    localStorage.setItem('encrypted_files', JSON.stringify(updatedFiles));
-    setFiles(updatedFiles);
-  };
-  
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const uploadedFiles = event.target.files;
-    if (!uploadedFiles || uploadedFiles.length === 0) return;
-    
-    const encryptionKey = getCurrentUserEncryptionKey();
-    if (!encryptionKey) {
-      toast({
-        title: "Authentication error",
-        description: "Please log in again to access your encryption key.",
-        variant: "destructive"
-      });
-      navigate('/login');
-      return;
-    }
-    
-    setIsUploading(true);
-    
+  // Load files and storage usage
+  const loadData = async () => {
+    setIsLoading(true);
     try {
-      const newFiles: FileItem[] = [...files];
+      // Get files
+      const fileData = await listFiles();
+      setFiles(fileData);
       
-      for (let i = 0; i < uploadedFiles.length; i++) {
-        const file = uploadedFiles[i];
-        
-        const encryptedBlob = await encryptFile(file, encryptionKey);
-        
-        const fileReader = new FileReader();
-        
-        const readFilePromise = new Promise<string>((resolve, reject) => {
-          fileReader.onload = () => resolve(fileReader.result as string);
-          fileReader.onerror = reject;
-        });
-        
-        fileReader.readAsDataURL(encryptedBlob);
-        const encryptedFileData = await readFilePromise;
-        
-        const newFile: FileItem = {
-          id: crypto.randomUUID(),
-          name: file.name,
-          size: encryptedBlob.size,
-          type: file.type,
-          encryptedType: encryptedBlob.type,
-          dateAdded: new Date().toISOString(),
-          encrypted: true
-        };
-        
-        localStorage.setItem(`file_${newFile.id}`, encryptedFileData);
-        
-        newFiles.push(newFile);
-      }
-      
-      saveFiles(newFiles);
-      
-      toast({
-        title: `${uploadedFiles.length > 1 ? 'Files' : 'File'} uploaded`,
-        description: `${uploadedFiles.length} ${uploadedFiles.length > 1 ? 'files have' : 'file has'} been encrypted and stored.`,
+      // Get storage usage
+      const usage = await getUserStorageUsage();
+      setStorageUsage({
+        totalSize: usage.totalSize,
+        fileCount: usage.fileCount,
+        limit: usage.limit
       });
     } catch (error) {
-      console.error('Error uploading files:', error);
+      console.error('Error loading data:', error);
       toast({
-        title: "Upload failed",
-        description: "There was an error encrypting and uploading your files.",
+        title: "Error",
+        description: "Failed to load your files and storage information.",
         variant: "destructive"
       });
     } finally {
-      setIsUploading(false);
-      event.target.value = '';
+      setIsLoading(false);
     }
   };
   
-  const downloadFile = async (fileId: string) => {
+  // Load data on initial render
+  useEffect(() => {
+    loadData();
+  }, []);
+  
+  // Handle file download
+  const handleDownloadFile = async (filePath: string, fileName: string, fileType: string) => {
     try {
-      const fileToDownload = files.find(file => file.id === fileId);
-      if (!fileToDownload) return;
+      const decryptedBlob = await downloadEncryptedFile(filePath, fileName, fileType);
       
-      const encryptionKey = getCurrentUserEncryptionKey();
-      if (!encryptionKey) {
-        toast({
-          title: "Authentication error",
-          description: "Please log in again to access your encryption key.",
-          variant: "destructive"
-        });
-        navigate('/login');
-        return;
+      if (decryptedBlob) {
+        // Create a URL for the blob
+        const url = URL.createObjectURL(decryptedBlob);
+        
+        // Create a link element
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        
+        // Click the link to trigger the download
+        a.click();
+        
+        // Clean up
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       }
-      
-      const encryptedFileData = localStorage.getItem(`file_${fileId}`);
-      if (!encryptedFileData) {
-        toast({
-          title: "File not found",
-          description: "The requested file could not be found.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      const response = await fetch(encryptedFileData);
-      const encryptedBlob = await response.blob();
-      
-      const decryptedBlob = await decryptFile(encryptedBlob, encryptionKey, fileToDownload.type);
-      
-      const url = URL.createObjectURL(decryptedBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileToDownload.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "File decrypted",
-        description: `${fileToDownload.name} has been decrypted and downloaded.`,
-      });
     } catch (error) {
       console.error('Error downloading file:', error);
-      toast({
-        title: "Download failed",
-        description: "There was an error decrypting and downloading your file.",
-        variant: "destructive"
-      });
     }
   };
   
-  const deleteFile = (fileId: string) => {
+  // Handle file deletion
+  const handleDeleteFile = async (filePath: string) => {
     try {
-      const updatedFiles = files.filter(file => file.id !== fileId);
-      saveFiles(updatedFiles);
-      
-      localStorage.removeItem(`file_${fileId}`);
-      
-      toast({
-        title: "File deleted",
-        description: "The file has been permanently deleted.",
-      });
+      const success = await deleteFile(filePath);
+      if (success) {
+        // Reload data after deletion
+        loadData();
+      }
     } catch (error) {
       console.error('Error deleting file:', error);
-      toast({
-        title: "Delete failed",
-        description: "There was an error deleting your file.",
-        variant: "destructive"
-      });
     }
   };
+  
+  // Filter files based on search query
+  const filteredFiles = searchQuery
+    ? files.filter(file => 
+        file.original_name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : files;
 
   return (
     <ThreeDLayout>
       <div className="container py-8 animate-fade-in">
-        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-medium tracking-tight text-green-800">My Secure Vault</h1>
-            <p className="text-green-700/80 mt-1">
-              All files are end-to-end encrypted
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <SearchBar 
-              value={searchQuery} 
-              onChange={setSearchQuery} 
-            />
-            
-            <label htmlFor="file-upload">
-              <Button className="gap-2 bg-green-600 hover:bg-green-700">
-                <FilePlus className="h-4 w-4" />
-                Upload File
-                <input
-                  id="file-upload"
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  disabled={isUploading}
-                />
-              </Button>
-            </label>
-          </div>
+        <header className="mb-8">
+          <h1 className="text-3xl font-medium tracking-tight text-green-800">My Secure Vault</h1>
+          <p className="text-green-700/80 mt-1">
+            All files are end-to-end encrypted
+          </p>
         </header>
         
-        <FileList 
-          files={files.map(file => ({
-            id: file.id,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            encryptedType: file.encryptedType,
-            dateAdded: file.dateAdded,
-            encrypted: file.encrypted
-          }))}
-          searchQuery={searchQuery}
-          activeTab={activeTab}
-          isLoading={isUploading}
-          setActiveTab={setActiveTab}
-          handleFileUpload={handleFileUpload}
-          downloadFile={downloadFile}
-          deleteFile={deleteFile}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2">
+            <FileListHeader
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onRefresh={loadData}
+              isLoading={isLoading}
+            />
+            <FileList 
+              files={filteredFiles.map(file => ({
+                id: file.id,
+                name: file.original_name,
+                size: file.size,
+                type: file.original_type,
+                dateAdded: file.created_at,
+                encrypted: file.encrypted,
+                filePath: file.file_path
+              }))}
+              isLoading={isLoading}
+              onDownload={(id, filePath, name, type) => 
+                handleDownloadFile(filePath, name, type)
+              }
+              onDelete={(id, filePath) => 
+                handleDeleteFile(filePath)
+              }
+            />
+          </div>
+          
+          <div>
+            <StorageUsageDisplay
+              used={storageUsage.totalSize}
+              limit={storageUsage.limit}
+              fileCount={storageUsage.fileCount}
+            />
+          </div>
+        </div>
       </div>
     </ThreeDLayout>
   );
