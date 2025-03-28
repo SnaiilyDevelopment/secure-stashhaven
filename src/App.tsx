@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +12,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import { isAuthenticated, handleAuthError, AuthStatus } from "./lib/auth";
+import { isAuthenticated, handleAuthError, AuthStatus, AuthError } from "./lib/auth"; // Properly import AuthError
 import { supabase } from "./integrations/supabase/client";
 import { toast } from "./components/ui/use-toast";
 import { AUTH_CHECK_TIMEOUT, AUTH_CHECK_FAST_TIMEOUT } from "./lib/storage/constants";
