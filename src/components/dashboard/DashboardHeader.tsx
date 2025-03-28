@@ -1,31 +1,24 @@
 
 import React from 'react';
-import { 
-  PageHeader, 
-  PageHeaderDescription, 
-  PageHeaderHeading 
-} from '@/components/ui/page-header';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 
 interface DashboardHeaderProps {
-  onUploadClick: () => void;
+  title: string;
+  subtitle?: string;
 }
 
-const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onUploadClick }) => {
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
+  title, 
+  subtitle 
+}) => {
   return (
-    <PageHeader className="pb-8">
-      <div className="flex items-center justify-between">
-        <PageHeaderHeading>My Secure Files</PageHeaderHeading>
-        <Button onClick={onUploadClick} className="flex gap-1 items-center">
-          <Plus className="h-4 w-4" />
-          Upload
-        </Button>
-      </div>
-      <PageHeaderDescription>
-        Upload, manage, and securely share your encrypted files.
-      </PageHeaderDescription>
-    </PageHeader>
+    <header className="mb-8">
+      <h1 className="text-3xl font-medium tracking-tight text-green-800">{title}</h1>
+      {subtitle && (
+        <p className="text-green-700/80 mt-1">
+          {subtitle}
+        </p>
+      )}
+    </header>
   );
 };
 
