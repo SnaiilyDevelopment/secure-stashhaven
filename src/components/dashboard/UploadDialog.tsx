@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { uploadEncryptedFile } from '@/lib/storage/fileOperations';
-import { ensureStorageBucket } from '@/lib/storage/storageUtils';
+import { ensureStorageBucket, validateFile, hasEnoughStorageSpace, getUserStorageUsage, getStorageQuota } from '@/lib/storage/storageUtils';
 import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import StorageQuotaDisplay from './upload/StorageQuotaDisplay';
@@ -29,20 +29,44 @@ interface UploadDialogProps {
 
 const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [storageQuota, setStorageQuota] = useState<{
+    percentUsed: number;
+    formattedUsed: string;
+    formattedAvailable: string;
+  } | null>(null);
   const { folders } = useDashboardData(false);
   
+  // Fetch storage quota data when dialog opens
   useEffect(() => {
-    if (selectedFile) {
-      const previewUrl = URL.createObjectURL(selectedFile);
-      setFilePreviewUrl(previewUrl);
-      return () => URL.revokeObjectURL(previewUrl); // Cleanup
+    if (open) {
+      fetchStorageQuota();
     }
-  }, [selectedFile]);
+  }, [open]);
+  
+  const fetchStorageQuota = async () => {
+    try {
+      const usage = await getUserStorageUsage();
+      const quota = await getStorageQuota();
+      
+      if (usage && quota) {
+        const percentUsed = (usage.totalSize / quota) * 100;
+        const formattedUsed = formatBytes(usage.totalSize);
+        const formattedAvailable = formatBytes(quota - usage.totalSize);
+        
+        setStorageQuota({
+          percentUsed,
+          formattedUsed,
+          formattedAvailable
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching storage quota:", error);
+    }
+  };
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -58,6 +82,30 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProp
     setUploadProgress(0);
     
     try {
+      // Validate file before upload
+      const fileValidation = validateFile(selectedFile);
+      if (!fileValidation.valid) {
+        toast({
+          title: "Upload failed",
+          description: fileValidation.message,
+          variant: "destructive"
+        });
+        setIsUploading(false);
+        return;
+      }
+      
+      // Check storage space
+      const hasSpace = await hasEnoughStorageSpace(selectedFile.size);
+      if (!hasSpace) {
+        toast({
+          title: "Upload failed",
+          description: "You've reached your storage limit. Please delete some files before uploading more.",
+          variant: "destructive"
+        });
+        setIsUploading(false);
+        return;
+      }
+      
       // Create bucket if it doesn't exist
       await ensureStorageBucket(STORAGE_BUCKET_NAME);
       
@@ -90,7 +138,6 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProp
   
   const resetState = () => {
     setSelectedFile(null);
-    setFilePreviewUrl(null);
     setUploadProgress(0);
     setUploadError(null);
     setIsUploading(false);
@@ -111,8 +158,7 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProp
           <div className="space-y-4">
             <FilePreview
               file={selectedFile}
-              previewUrl={filePreviewUrl}
-              onRemove={resetState}
+              isValid={true}
             />
             
             {/* Add folder selector */}
@@ -129,7 +175,10 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProp
             )}
             
             {isUploading ? (
-              <UploadProgress progress={uploadProgress} />
+              <UploadProgress 
+                isUploading={isUploading} 
+                progress={uploadProgress} 
+              />
             ) : (
               <Button 
                 onClick={handleUpload} 
@@ -141,7 +190,7 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProp
           </div>
         ) : (
           <div className="space-y-4">
-            <StorageQuotaDisplay onRefresh={() => {}} />
+            <StorageQuotaDisplay storageQuota={storageQuota} />
             
             <div className="flex justify-center">
               <div className="flex items-center justify-center w-full">
@@ -181,3 +230,13 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProp
 };
 
 export default UploadDialog;
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
