@@ -77,29 +77,36 @@ export const useAuthCheck = () => {
     };
     initialCheck();
     
-    // Keep-alive interval to prevent session timeout (every 45 seconds)
+    // Optimized keep-alive with debouncing (every 2 minutes)
     const keepAliveInterval = setInterval(() => {
-      // Silently refresh session before it expires
-      supabase.auth.getSession()
-        .then(({ data }) => {
-          if (data.session) {
-            console.debug("Session keep-alive successful");
-            setLastChecked(Date.now());
-          }
-        })
-        .catch(error => {
-          console.debug("Keep-alive check failed:", error);
-        });
-    }, 45 * 1000);
-
-    // Full auth check interval (every 5 minutes)
-    const refreshInterval = setInterval(() => {
-      checkAuth();
-    }, 5 * 60 * 1000);
+      const now = Date.now();
+      // Only refresh if it's been more than 90 seconds since last successful check
+      if (now - lastChecked > 90 * 1000) {
+        supabase.auth.getSession()
+          .then(({ data }) => {
+            if (data.session) {
+              console.debug("Session keep-alive successful");
+              setLastChecked(now);
+            }
+          })
+          .catch(error => {
+            console.debug("Keep-alive check failed:", error);
+            // Retry after 30 seconds on failure
+            setTimeout(() => {
+              supabase.auth.getSession()
+                .then(({ data }) => {
+                  if (data.session) {
+                    setLastChecked(Date.now());
+                  }
+                });
+            }, 30000);
+          });
+      }
+    }, 120 * 1000);
     
     return () => {
-      clearInterval(refreshInterval);
-      subscription.unsubscribe();
+      clearInterval(keepAliveInterval);
+      subscription?.unsubscribe();
     };
   }, [checkAuth, lastChecked, navigate]);
   
