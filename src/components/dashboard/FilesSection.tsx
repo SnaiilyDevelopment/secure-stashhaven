@@ -4,14 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
 import SearchBar from './SearchBar';
 import { FileItemAdapter, adaptFileMetadataToFileItem, adaptSharedFileToFileItem } from '@/lib/adapters/fileAdapter';
-import { FileMetadata } from '@/lib/storage';
 import { SharedFile } from '@/lib/filesharing';
 import { useSearch } from '@/hooks/useSearch';
 import { toast } from '@/components/ui/use-toast';
 import { AlertCircle } from 'lucide-react';
 
 interface FilesSectionProps {
-  files: FileMetadata[];
+  files: FileItemAdapter[];
   sharedFiles: SharedFile[];
   isLoading: boolean;
   searchTerm: string;
@@ -59,30 +58,20 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     }
   };
   
-  // Filter files based on search term, using original_name property
+  // Filter files based on search term
   const filteredFiles = safeFilter(
     files, 
     searchTerm, 
-    (file) => file.original_name
+    (file) => file.name
   );
   
-  // Filter shared files based on search term, using original_name property
+  // Filter shared files based on search term
   const filteredSharedFiles = safeFilter(
     sharedFiles, 
     searchTerm, 
     (file) => file.original_name
   );
 
-  // Convert FileMetadata to FileItemAdapter using our adapter with error handling
-  const adaptedFiles = filteredFiles.map(file => {
-    try {
-      return adaptFileMetadataToFileItem(file);
-    } catch (error) {
-      console.error("Error adapting file metadata:", file, error);
-      return null;
-    }
-  }).filter(Boolean) as FileItemAdapter[];
-  
   // Convert SharedFile to FileItemAdapter using our adapter with error handling
   const adaptedSharedFiles = filteredSharedFiles.map(file => {
     try {
@@ -130,7 +119,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
         
         <TabsContent value="my-files" className="mt-6">
           <FileList 
-            files={adaptedFiles}
+            files={filteredFiles}
             isLoading={isLoading}
             onDeleteComplete={onRefresh}
             emptyMessage="No files found. Upload your first encrypted file."
