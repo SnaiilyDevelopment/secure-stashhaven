@@ -18,6 +18,19 @@ export const listUserFiles = async (
   bucketName: string = 'secure-files'
 ): Promise<FileMetadata[]> => {
   try {
+    console.log("Fetching files from file_metadata table...");
+    
+    // Get the current user's ID
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error("Error getting current user:", userError);
+      throw new Error("Authentication error: " + (userError?.message || "Unable to get current user"));
+    }
+    
+    console.log("Current user ID:", user.id);
+    
+    // Get all files for the current user
     const { data, error } = await supabase
       .from('file_metadata')
       .select('*')
@@ -32,6 +45,8 @@ export const listUserFiles = async (
       });
       return [];
     }
+    
+    console.log("Files fetched successfully:", data?.length || 0, "files");
     
     return data || [];
   } catch (error) {

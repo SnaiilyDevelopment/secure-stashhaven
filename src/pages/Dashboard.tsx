@@ -10,20 +10,34 @@ import FileListHeader from '@/components/dashboard/FileListHeader';
 import StorageUsageDisplay from '@/components/dashboard/StorageUsageDisplay';
 import { listFiles, downloadEncryptedFile, deleteFile } from '@/lib/storage/fileOperations';
 import { getUserStorageUsage } from '@/lib/storage/storageUtils';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Dashboard = () => {
   const [files, setFiles] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [storageUsage, setStorageUsage] = useState({ totalSize: 0, fileCount: 0, limit: 0 });
+  const [authError, setAuthError] = useState<string | null>(null);
   const navigate = useNavigate();
   
+  // Check authentication
   useEffect(() => {
-    // Check authentication
     const checkAuth = async () => {
-      const authStatus = await isAuthenticated();
-      if (!authStatus.authenticated) {
-        navigate('/login');
+      try {
+        const authStatus = await isAuthenticated();
+        if (!authStatus.authenticated) {
+          if (authStatus.error) {
+            console.error("Auth error:", authStatus.error, authStatus.errorMessage);
+            setAuthError(authStatus.errorMessage || "Authentication failed. Please log in again.");
+          }
+          navigate('/login');
+        } else {
+          setAuthError(null);
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        setAuthError("Authentication check failed. You can try refreshing the page.");
       }
     };
     
@@ -34,17 +48,48 @@ const Dashboard = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Get files
-      const fileData = await listFiles();
+      console.log("Fetching files and storage usage...");
+      
+      // Get files with retry mechanism
+      let fileData = [];
+      let retries = 0;
+      const maxRetries = 2;
+      
+      while (retries <= maxRetries) {
+        try {
+          fileData = await listFiles();
+          console.log("Files fetched:", fileData);
+          break; // Exit loop if successful
+        } catch (error) {
+          console.error(`Error fetching files (attempt ${retries + 1}/${maxRetries + 1}):`, error);
+          retries++;
+          
+          if (retries <= maxRetries) {
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to load your files. Please try refreshing.",
+              variant: "destructive"
+            });
+          }
+        }
+      }
+      
       setFiles(fileData);
       
       // Get storage usage
-      const usage = await getUserStorageUsage();
-      setStorageUsage({
-        totalSize: usage.totalSize,
-        fileCount: usage.fileCount,
-        limit: usage.limit
-      });
+      try {
+        const usage = await getUserStorageUsage();
+        setStorageUsage({
+          totalSize: usage.totalSize,
+          fileCount: usage.fileCount,
+          limit: usage.limit
+        });
+      } catch (error) {
+        console.error('Error loading storage usage:', error);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -109,6 +154,11 @@ const Dashboard = () => {
       )
     : files;
 
+  const handleRetry = () => {
+    setAuthError(null);
+    loadData();
+  };
+
   return (
     <ThreeDLayout>
       <div className="container py-8 animate-fade-in">
@@ -118,6 +168,23 @@ const Dashboard = () => {
             All files are end-to-end encrypted
           </p>
         </header>
+
+        {authError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>{authError}</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRetry}
+                className="ml-4"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">
@@ -144,6 +211,8 @@ const Dashboard = () => {
               onDelete={(id, filePath) => 
                 handleDeleteFile(filePath)
               }
+              onDeleteComplete={loadData}
+              emptyMessage="No files found. Upload your first encrypted file."
             />
           </div>
           

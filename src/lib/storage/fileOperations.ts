@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { encryptFile, decryptFile, getCurrentUserEncryptionKey } from "../encryption";
@@ -70,6 +71,46 @@ export const uploadEncryptedFile = async (
       toast({
         title: "Upload failed",
         description: error.message,
+        variant: "destructive"
+      });
+      return null;
+    }
+    
+    // IMPORTANT: Create metadata entry for the file
+    // This was the main issue - ensure we're saving metadata
+    try {
+      const { error: metadataError } = await supabase
+        .from('file_metadata')
+        .insert([
+          {
+            file_path: data.path,
+            original_name: file.name,
+            original_type: file.type,
+            size: file.size,
+            encrypted: true
+          }
+        ]);
+        
+      if (metadataError) {
+        console.error("Metadata creation error:", metadataError);
+        // Try to delete the uploaded file if metadata creation fails
+        await supabase.storage.from(bucketName).remove([data.path]);
+        
+        toast({
+          title: "Upload failed",
+          description: "Failed to create file metadata. Please try again.",
+          variant: "destructive"
+        });
+        return null;
+      }
+    } catch (metadataError) {
+      console.error("Metadata creation error:", metadataError);
+      // Try to delete the uploaded file if metadata creation fails
+      await supabase.storage.from(bucketName).remove([data.path]);
+      
+      toast({
+        title: "Upload failed",
+        description: "Failed to create file metadata. Please try again.",
         variant: "destructive"
       });
       return null;
