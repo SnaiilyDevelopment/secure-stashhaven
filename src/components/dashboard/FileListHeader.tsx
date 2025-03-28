@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, FolderOpen, Folder } from 'lucide-react';
+import { RefreshCw, FolderPlus, Upload } from 'lucide-react';
 import SearchBar from './SearchBar';
+import UploadDialog from './UploadDialog';
 
 interface FileListHeaderProps {
   searchQuery: string;
@@ -19,37 +20,43 @@ const FileListHeader: React.FC<FileListHeaderProps> = ({
   isLoading,
   currentFolder
 }) => {
+  const [showUploadDialog, setShowUploadDialog] = React.useState(false);
+  
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-      <div className="flex items-center">
-        {currentFolder ? (
-          <Folder className="h-5 w-5 text-green-600 mr-2" />
-        ) : (
-          <FolderOpen className="h-5 w-5 text-green-600 mr-2" />
-        )}
-        <h2 className="text-xl font-medium text-green-800">
-          {currentFolder ? `Folder: ${currentFolder}` : 'All Files'}
-        </h2>
-      </div>
-      
-      <div className="flex w-full sm:w-auto gap-2">
+    <div className="mb-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="w-full md:w-2/3">
         <SearchBar 
           value={searchQuery} 
-          onChange={onSearchChange}
-          placeholder="Search files..."
-          className="w-full sm:w-64"
+          onChange={onSearchChange} 
         />
+      </div>
+      
+      <div className="w-full md:w-auto flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
           onClick={onRefresh}
           disabled={isLoading}
-          className="shrink-0"
+          title="Refresh files"
         >
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          <span className="sr-only">Refresh</span>
+        </Button>
+        
+        <Button
+          variant="secondary"
+          onClick={() => setShowUploadDialog(true)}
+          className="ml-auto"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload
         </Button>
       </div>
+      
+      <UploadDialog
+        open={showUploadDialog}
+        onOpenChange={setShowUploadDialog}
+        onUploadComplete={onRefresh}
+      />
     </div>
   );
 };

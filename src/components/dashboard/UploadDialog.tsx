@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -15,9 +16,9 @@ import { uploadEncryptedFile } from '@/lib/storage/fileOperations';
 import { ensureStorageBucket } from '@/lib/storage/storageUtils';
 import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { StorageQuotaDisplay } from './StorageQuotaDisplay';
-import { FilePreview } from './upload/FilePreview';
-import { UploadProgress } from './upload/UploadProgress';
+import StorageQuotaDisplay from './upload/StorageQuotaDisplay';
+import FilePreview from './upload/FilePreview';
+import UploadProgress from './upload/UploadProgress';
 import FolderSelector from './upload/FolderSelector';
 
 interface UploadDialogProps {
