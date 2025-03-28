@@ -11,11 +11,15 @@ const Dashboard = () => {
   const { authError, handleRetry } = useAuthCheck();
   const { 
     filteredFiles, 
+    folders,
+    currentFolder,
     isLoading, 
     storageUsage, 
     searchQuery, 
     setSearchQuery, 
-    loadData 
+    loadData,
+    createFolder,
+    selectFolder
   } = useDashboardData();
   
   const handleRetryWithRefresh = () => {
@@ -38,11 +42,15 @@ const Dashboard = () => {
         
         <DashboardContent 
           files={filteredFiles}
+          folders={folders}
+          currentFolder={currentFolder}
           isLoading={isLoading}
           storageUsage={storageUsage}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onRefresh={loadData}
+          onFolderCreate={createFolder}
+          onFolderSelect={selectFolder}
         />
       </div>
     </ThreeDLayout>

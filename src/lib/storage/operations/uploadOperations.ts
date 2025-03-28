@@ -9,7 +9,7 @@ import { STORAGE_BUCKET_NAME } from "../constants";
 export const uploadEncryptedFile = async (
   file: File,
   bucketName: string = STORAGE_BUCKET_NAME,
-  path?: string,
+  folder?: string | null,
   onProgress?: (progress: number) => void
 ): Promise<string | null> => {
   try {
@@ -51,8 +51,11 @@ export const uploadEncryptedFile = async (
     const encryptedBlob = await encryptFile(file, encryptionKey);
     onProgress?.(40); // Encryption complete
     
-    // Create a file path if not provided
-    const filePath = path || `${Date.now()}_${file.name}`;
+    // Create a file path, including folder if specified
+    const timestamp = Date.now();
+    const filePath = folder 
+      ? `${folder}/${timestamp}_${file.name}` 
+      : `${timestamp}_${file.name}`;
     
     // Upload encrypted file
     const { data, error } = await supabase.storage

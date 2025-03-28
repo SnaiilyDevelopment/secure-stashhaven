@@ -1,231 +1,178 @@
-
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose
+  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { AlertCircle, Upload, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Upload } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 import { uploadEncryptedFile } from '@/lib/storage/fileOperations';
-import { ensureStorageBucket, getStorageQuota, validateFile } from '@/lib/storage/storageUtils';
+import { ensureStorageBucket } from '@/lib/storage/storageUtils';
 import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
-import FilePreview from './upload/FilePreview';
-import UploadProgress from './upload/UploadProgress';
-import StorageQuotaDisplay from './upload/StorageQuotaDisplay';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { StorageQuotaDisplay } from './StorageQuotaDisplay';
+import { FilePreview } from './upload/FilePreview';
+import { UploadProgress } from './upload/UploadProgress';
+import FolderSelector from './upload/FolderSelector';
 
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUploadComplete: () => void;
+  onUploadComplete?: () => void;
 }
 
-const UploadDialog: React.FC<UploadDialogProps> = ({ 
-  open, 
-  onOpenChange,
-  onUploadComplete
-}) => {
+const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [validationStatus, setValidationStatus] = useState<{
-    valid: boolean;
-    message?: string;
-  } | null>(null);
-  const [storageQuota, setStorageQuota] = useState<{
-    used: number;
-    limit: number;
-    available: number;
-    percentUsed: number;
-    formattedUsed: string;
-    formattedLimit: string;
-    formattedAvailable: string;
-  } | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const { folders } = useDashboardData(false);
   
   useEffect(() => {
-    if (open) {
-      // Only try to ensure bucket exists if the dialog is open
-      const setupBucket = async () => {
-        try {
-          await ensureStorageBucket(STORAGE_BUCKET_NAME);
-        } catch (err) {
-          console.error("Failed to ensure bucket exists:", err);
-          // Don't show an error to the user, just log it
-        }
-      };
-      
-      // Get storage quota information
-      const getQuota = async () => {
-        try {
-          const quota = await getStorageQuota();
-          setStorageQuota(quota);
-        } catch (err) {
-          console.error("Failed to get storage quota:", err);
-        }
-      };
-      
-      // Run both operations
-      setupBucket();
-      getQuota();
+    if (selectedFile) {
+      const previewUrl = URL.createObjectURL(selectedFile);
+      setFilePreviewUrl(previewUrl);
+      return () => URL.revokeObjectURL(previewUrl); // Cleanup
     }
-  }, [open]);
+  }, [selectedFile]);
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
       setSelectedFile(file);
-      
-      const validation = validateFile(file);
-      setValidationStatus(validation);
-      
-      if (!validation.valid) {
-        setError(validation.message || "Invalid file");
-      } else {
-        setError(null);
-        
-        if (storageQuota && file.size > storageQuota.available) {
-          setError(`Not enough storage space. You only have ${storageQuota.formattedAvailable} available.`);
-        }
-      }
     }
   };
   
   const handleUpload = async () => {
-    if (!selectedFile) {
-      setError("Please select a file first");
-      return;
-    }
-    
-    const quota = await getStorageQuota();
-    if (selectedFile.size > quota.available) {
-      setError(`Not enough storage space. You only have ${quota.formattedAvailable} available.`);
-      return;
-    }
+    if (!selectedFile) return;
     
     setIsUploading(true);
-    setProgress(0);
-    setError(null);
+    setUploadProgress(0);
     
     try {
+      // Create bucket if it doesn't exist
+      await ensureStorageBucket(STORAGE_BUCKET_NAME);
+      
+      // Upload the file with folder information
       const filePath = await uploadEncryptedFile(
-        selectedFile, 
-        STORAGE_BUCKET_NAME, 
-        undefined, 
-        (p) => setProgress(p)
+        selectedFile,
+        STORAGE_BUCKET_NAME,
+        selectedFolder,
+        (progress) => setUploadProgress(progress)
       );
       
-      if (!filePath) {
-        throw new Error("Upload failed");
+      if (filePath) {
+        // Upload successful
+        setTimeout(() => {
+          onUploadComplete?.();
+          onOpenChange(false);
+          resetState();
+        }, 1000);
+      } else {
+        // Upload failed
+        setUploadError('Failed to upload file. Please try again.');
       }
-      
-      setSelectedFile(null);
-      
-      setTimeout(() => {
-        onOpenChange(false);
-        onUploadComplete();
-      }, 500);
-    } catch (err) {
-      console.error("File upload error:", err);
-      setError("Failed to upload file. Please try again.");
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError('An unexpected error occurred during upload.');
     } finally {
       setIsUploading(false);
     }
   };
   
-  const getSupportedFormats = () => {
-    return "All file types are supported";
+  const resetState = () => {
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    setUploadProgress(0);
+    setUploadError(null);
+    setIsUploading(false);
+    setSelectedFolder(null);
   };
   
   return (
-    <Dialog open={open} onOpenChange={(value) => {
-      if (!isUploading) {
-        onOpenChange(value);
-        if (!value) {
-          setSelectedFile(null);
-          setError(null);
-          setValidationStatus(null);
-        }
-      }
-    }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Encrypted File</DialogTitle>
+          <DialogTitle>Upload File</DialogTitle>
           <DialogDescription>
-            Files are encrypted before being sent to the server.
+            Upload a file to your secure vault. Files are end-to-end encrypted.
           </DialogDescription>
         </DialogHeader>
         
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+        {selectedFile ? (
+          <div className="space-y-4">
+            <FilePreview
+              file={selectedFile}
+              previewUrl={filePreviewUrl}
+              onRemove={resetState}
+            />
+            
+            {/* Add folder selector */}
+            <FolderSelector
+              folders={folders}
+              selectedFolder={selectedFolder}
+              onFolderChange={setSelectedFolder}
+            />
+            
+            {uploadError && (
+              <div className="text-red-500 text-sm mt-2">
+                {uploadError}
+              </div>
+            )}
+            
+            {isUploading ? (
+              <UploadProgress progress={uploadProgress} />
+            ) : (
+              <Button 
+                onClick={handleUpload} 
+                className="w-full"
+              >
+                Upload File
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <StorageQuotaDisplay onRefresh={() => {}} />
+            
+            <div className="flex justify-center">
+              <div className="flex items-center justify-center w-full">
+                <label
+                  htmlFor="file-upload"
+                  className="flex flex-col items-center justify-center w-full h-44 border-2 border-green-300 border-dashed rounded-lg cursor-pointer bg-green-50 hover:bg-green-100 transition-colors"
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-10 h-10 mb-3 text-green-500" />
+                    <p className="mb-2 text-sm text-green-700">
+                      <span className="font-semibold">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-xs text-green-600">Any file type (max 50MB)</p>
+                  </div>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
         )}
         
-        <StorageQuotaDisplay storageQuota={storageQuota} />
-        
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label htmlFor="file">Select file to upload</Label>
-            <Input 
-              id="file" 
-              type="file" 
-              onChange={handleFileChange} 
-              disabled={isUploading}
-            />
-            <p className="text-xs text-muted-foreground">
-              {getSupportedFormats()}
-            </p>
-          </div>
-          
-          {selectedFile && validationStatus?.valid && (
-            <FilePreview 
-              file={selectedFile} 
-              isValid={validationStatus.valid} 
-            />
-          )}
-          
-          <UploadProgress 
-            isUploading={isUploading} 
-            progress={progress} 
-          />
-        </div>
-        
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="sm:justify-start">
           <DialogClose asChild>
-            <Button 
-              type="button" 
-              variant="secondary" 
-              disabled={isUploading}
-            >
+            <Button type="button" variant="secondary">
               Cancel
             </Button>
           </DialogClose>
-          <Button 
-            type="button" 
-            onClick={handleUpload} 
-            disabled={!selectedFile || !!error || isUploading || !validationStatus?.valid}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading
-              </>
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload
-              </>
-            )}
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
