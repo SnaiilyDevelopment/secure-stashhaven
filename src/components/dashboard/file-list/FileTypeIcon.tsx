@@ -7,11 +7,6 @@ interface FileTypeIconProps {
 }
 
 const FileTypeIcon: React.FC<FileTypeIconProps> = ({ fileType }) => {
-  // Handle undefined or null fileType
-  if (!fileType) {
-    return <FileIcon className="h-4 w-4 text-green-500" />;
-  }
-  
   if (fileType.includes('image/')) {
     return <Image className="h-4 w-4 text-green-500" />;
   }

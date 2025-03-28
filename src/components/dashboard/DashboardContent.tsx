@@ -1,14 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FilesSection from './FilesSection';
 import FolderManager from './FolderManager';
 import { SharedFile } from '@/lib/filesharing';
+import { FileMetadata } from '@/lib/storage';
 import { getFilesSharedWithMe } from '@/lib/filesharing';
-import { FileItemAdapter } from '@/lib/adapters/fileAdapter';
+import { useEffect } from 'react';
 
 interface DashboardContentProps {
-  files: FileItemAdapter[];
+  files: FileMetadata[];
   folders: string[];
   currentFolder: string | null;
   isLoading: boolean;

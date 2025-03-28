@@ -2,11 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { listFiles } from '@/lib/storage/fileOperations';
 import { toast } from '@/components/ui/use-toast';
-import { FileItemAdapter, adaptFileMetadataToFileItem } from '@/lib/adapters/fileAdapter';
+import { FileItem } from '@/components/dashboard/FileList';
 
 export interface DashboardState {
-  files: FileItemAdapter[];
-  filteredFiles: FileItemAdapter[];
+  files: FileItem[];
+  filteredFiles: FileItem[];
   folders: string[];
   currentFolder: string | null;
   isLoading: boolean;
@@ -14,7 +14,7 @@ export interface DashboardState {
 }
 
 export const useDashboardData = (initialLoad = true) => {
-  const [files, setFiles] = useState<FileItemAdapter[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,7 +26,7 @@ export const useDashboardData = (initialLoad = true) => {
       console.log("Fetching files...");
       
       // Get files with retry mechanism
-      let fileData: FileItemAdapter[] = [];
+      let fileData = [];
       let retries = 0;
       const maxRetries = 2;
       
@@ -50,9 +50,16 @@ export const useDashboardData = (initialLoad = true) => {
               extractedFolders.add(folder);
             }
             
-            const adaptedFile = adaptFileMetadataToFileItem(file);
-            adaptedFile.folder = folder;
-            return adaptedFile;
+            return {
+              id: file.id,
+              name: file.original_name,
+              size: file.size,
+              type: file.original_type,
+              dateAdded: file.created_at,
+              encrypted: file.encrypted,
+              filePath: file.file_path,
+              folder
+            };
           });
           
           // Update folders list
