@@ -43,19 +43,39 @@ export const useAuthCheck = () => {
     // Initialize auth check
     checkAuth();
     
-    // Set up auth state listener to handle events like token expiration
+    // Set up auth state listener with initialization timeout handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth state changed:", event);
-      if (event === 'SIGNED_OUT') {
-        navigate('/login');
-      } else if (event === 'TOKEN_REFRESHED') {
-        // Clear any auth errors when token is refreshed successfully
-        setAuthError(null);
-      } else if (event === 'USER_UPDATED') {
-        // Force auth check when user is updated
-        checkAuth();
+      
+      switch (event) {
+        case 'SIGNED_OUT':
+          navigate('/login');
+          break;
+        case 'TOKEN_REFRESHED':
+          setAuthError(null);
+          break;
+        case 'USER_UPDATED':
+          checkAuth();
+          break;
+        case 'INITIAL_SESSION':
+          if (!session) {
+            console.log("Initial session check timed out, retrying...");
+            setTimeout(() => checkAuth(), 5000); // Retry after 5 seconds
+          }
+          break;
       }
     });
+
+    // Initial check with retry logic
+    const initialCheck = async () => {
+      try {
+        await checkAuth();
+      } catch (error) {
+        console.log("Initial auth check failed, retrying...", error);
+        setTimeout(() => initialCheck(), 5000); // Retry after 5 seconds
+      }
+    };
+    initialCheck();
     
     // Keep-alive interval to prevent session timeout (every 45 seconds)
     const keepAliveInterval = setInterval(() => {

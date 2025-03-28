@@ -12,7 +12,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    debug: true
   },
   global: {
     fetch: (input, init) => {
@@ -27,3 +29,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     }
   }
 });
+
+// Initialize with longer timeout
+supabase.auth.initialize().catch(err => {
+  console.warn("Initial auth check failed, will retry:", err);
+}); 
