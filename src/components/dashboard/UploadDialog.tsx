@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -11,12 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Upload, Loader2, FileIcon, FileText } from 'lucide-react';
+import { AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { uploadEncryptedFile } from '@/lib/storage/fileOperations';
-import { ensureStorageBucket, getStorageQuota, formatBytes, validateFile } from '@/lib/storage/storageUtils';
+import { ensureStorageBucket, getStorageQuota, validateFile } from '@/lib/storage/storageUtils';
 import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
+import FilePreview from './upload/FilePreview';
+import UploadProgress from './upload/UploadProgress';
+import StorageQuotaDisplay from './upload/StorageQuotaDisplay';
 
 interface UploadDialogProps {
   open: boolean;
@@ -49,15 +52,29 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   
   useEffect(() => {
     if (open) {
-      ensureStorageBucket(STORAGE_BUCKET_NAME).catch(err => {
-        console.error("Failed to ensure bucket exists:", err);
-      });
+      // Only try to ensure bucket exists if the dialog is open
+      const setupBucket = async () => {
+        try {
+          await ensureStorageBucket(STORAGE_BUCKET_NAME);
+        } catch (err) {
+          console.error("Failed to ensure bucket exists:", err);
+          // Don't show an error to the user, just log it
+        }
+      };
       
-      getStorageQuota().then(quota => {
-        setStorageQuota(quota);
-      }).catch(err => {
-        console.error("Failed to get storage quota:", err);
-      });
+      // Get storage quota information
+      const getQuota = async () => {
+        try {
+          const quota = await getStorageQuota();
+          setStorageQuota(quota);
+        } catch (err) {
+          console.error("Failed to get storage quota:", err);
+        }
+      };
+      
+      // Run both operations
+      setupBucket();
+      getQuota();
     }
   }, [open]);
   
@@ -123,19 +140,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     }
   };
   
-  const getFileIcon = () => {
-    if (!selectedFile) return null;
-    
-    if (selectedFile.type.includes('image/')) {
-      return <FileIcon className="h-6 w-6 text-blue-500" />;
-    } else if (selectedFile.type.includes('application/pdf') || 
-               selectedFile.type.includes('text/')) {
-      return <FileText className="h-6 w-6 text-green-500" />;
-    } else {
-      return <FileIcon className="h-6 w-6 text-gray-500" />;
-    }
-  };
-  
   const getSupportedFormats = () => {
     return "All file types are supported";
   };
@@ -166,25 +170,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
           </Alert>
         )}
         
-        {storageQuota && (
-          <div className="space-y-2 mb-2">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Storage used: {storageQuota.formattedUsed}</span>
-              <span>Available: {storageQuota.formattedAvailable}</span>
-            </div>
-            <Progress 
-              value={storageQuota.percentUsed} 
-              className="h-1.5" 
-              indicatorClassName={
-                storageQuota.percentUsed > 85 
-                  ? "bg-amber-500" 
-                  : storageQuota.percentUsed > 95 
-                    ? "bg-red-500" 
-                    : undefined
-              }
-            />
-          </div>
-        )}
+        <StorageQuotaDisplay storageQuota={storageQuota} />
         
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
@@ -201,30 +187,16 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
           </div>
           
           {selectedFile && validationStatus?.valid && (
-            <div className="flex items-center gap-2 text-sm p-3 bg-green-50 rounded-md text-green-700">
-              {getFileIcon()}
-              <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{selectedFile.name}</div>
-                <div className="text-xs">{formatBytes(selectedFile.size)}</div>
-              </div>
-            </div>
+            <FilePreview 
+              file={selectedFile} 
+              isValid={validationStatus.valid} 
+            />
           )}
           
-          {isUploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>
-                  {progress < 40 
-                    ? "Encrypting..." 
-                    : progress < 80 
-                      ? "Uploading..." 
-                      : "Finalizing..."}
-                </span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-          )}
+          <UploadProgress 
+            isUploading={isUploading} 
+            progress={progress} 
+          />
         </div>
         
         <DialogFooter className="sm:justify-between">

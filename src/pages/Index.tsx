@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { isAuthenticated } from '@/lib/auth';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { AUTH_CHECK_TIMEOUT } from '@/lib/storage/constants';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -17,10 +18,10 @@ const Index = () => {
         setLoading(true);
         setError(null);
         
-        // Add timeout to prevent hanging
+        // Add timeout to prevent hanging - increased timeout
         const authCheckPromise = isAuthenticated();
         const timeoutPromise = new Promise<boolean>((_, reject) => {
-          setTimeout(() => reject(new Error("Authentication check timed out")), 5000);
+          setTimeout(() => reject(new Error("Authentication check timed out")), AUTH_CHECK_TIMEOUT);
         });
         
         const authenticated = await Promise.race([authCheckPromise, timeoutPromise])
@@ -46,7 +47,7 @@ const Index = () => {
         // After error, still navigate to login for better user experience
         setTimeout(() => {
           navigate('/login');
-        }, 2000); // Reduced timeout to improve UX
+        }, 1500); // Reduced timeout to improve UX
       } finally {
         setLoading(false);
       }
@@ -60,7 +61,7 @@ const Index = () => {
         setError("Authentication check timed out");
         navigate('/login');
       }
-    }, 6000);
+    }, AUTH_CHECK_TIMEOUT);
     
     checkAuth();
     

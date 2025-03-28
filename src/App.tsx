@@ -15,6 +15,7 @@ import Settings from "./pages/Settings";
 import { isAuthenticated, handleAuthError, AuthStatus } from "./lib/auth";
 import { supabase } from "./integrations/supabase/client";
 import { toast } from "./components/ui/use-toast";
+import { AUTH_CHECK_TIMEOUT, AUTH_CHECK_FAST_TIMEOUT } from "./lib/storage/constants";
 
 // Create a custom error handler for the query client
 const queryErrorHandler = (error: unknown) => {
@@ -168,10 +169,10 @@ const App = () => {
       try {
         await setupAuthListener();
         
-        // Initial session check with timeout
+        // Initial session check with timeout - increased timeout to prevent issues
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Session check timed out")), 5000);
+          setTimeout(() => reject(new Error("Session check timed out")), AUTH_CHECK_FAST_TIMEOUT);
         });
         
         const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise])
@@ -220,7 +221,7 @@ const App = () => {
     
     checkAuth();
     
-    // If auth is hanging for too long, force ready state
+    // Increased timeout value to prevent auth timeout issues
     const forceReadyTimeout = setTimeout(() => {
       if (isMounted && isCheckingAuth) {
         console.log("Forcing ready state after timeout");
@@ -233,7 +234,7 @@ const App = () => {
           retryable: true
         });
       }
-    }, 6000);
+    }, AUTH_CHECK_TIMEOUT); // Increased from 6000ms for better reliability
     
     // Cleanup subscription on unmount
     return () => {
