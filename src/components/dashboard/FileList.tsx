@@ -32,13 +32,17 @@ interface FileListProps {
   isLoading: boolean;
   onDownload?: (id: string, filePath: string, name: string, type: string) => void;
   onDelete?: (id: string, filePath: string) => void;
+  onDeleteComplete?: () => void;
+  emptyMessage?: string;
 }
 
 const FileList: React.FC<FileListProps> = ({
   files,
   isLoading,
   onDownload,
-  onDelete
+  onDelete,
+  onDeleteComplete,
+  emptyMessage = "No files found"
 }) => {
   // Get appropriate icon for file type
   const getFileTypeIcon = (fileType: string) => {
@@ -80,7 +84,7 @@ const FileList: React.FC<FileListProps> = ({
           <AlertCircle className="h-10 w-10 text-green-400 mb-3" />
           <h3 className="text-lg font-medium text-green-800">No files found</h3>
           <p className="text-sm text-green-700/70 max-w-md mt-1">
-            Upload your first encrypted file to get started with secure storage.
+            {emptyMessage}
           </p>
         </CardContent>
       </Card>
@@ -135,6 +139,7 @@ const FileList: React.FC<FileListProps> = ({
                           onClick={() => {
                             if (confirm(`Are you sure you want to delete ${file.name}?`)) {
                               onDelete(file.id, file.filePath);
+                              onDeleteComplete?.(); // Call the onDeleteComplete callback after deletion
                             }
                           }}
                           className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
