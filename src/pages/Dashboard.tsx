@@ -14,7 +14,6 @@ const Dashboard = () => {
     folders,
     currentFolder,
     isLoading, 
-    storageUsage, 
     searchQuery, 
     setSearchQuery, 
     loadData,
@@ -45,7 +44,6 @@ const Dashboard = () => {
           folders={folders}
           currentFolder={currentFolder}
           isLoading={isLoading}
-          storageUsage={storageUsage}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onRefresh={loadData}

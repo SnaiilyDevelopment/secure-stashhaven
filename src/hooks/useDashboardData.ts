@@ -1,15 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { listFiles } from '@/lib/storage/fileOperations';
-import { getUserStorageUsage } from '@/lib/storage/storageUtils';
 import { toast } from '@/components/ui/use-toast';
 import { FileItem } from '@/components/dashboard/FileList';
-
-export interface StorageUsage {
-  totalSize: number;
-  fileCount: number;
-  limit: number;
-}
 
 export interface DashboardState {
   files: FileItem[];
@@ -17,7 +10,6 @@ export interface DashboardState {
   folders: string[];
   currentFolder: string | null;
   isLoading: boolean;
-  storageUsage: StorageUsage;
   searchQuery: string;
 }
 
@@ -27,16 +19,11 @@ export const useDashboardData = (initialLoad = true) => {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [storageUsage, setStorageUsage] = useState<StorageUsage>({ 
-    totalSize: 0, 
-    fileCount: 0, 
-    limit: 0 
-  });
   
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log("Fetching files and storage usage...");
+      console.log("Fetching files...");
       
       // Get files with retry mechanism
       let fileData = [];
@@ -97,23 +84,11 @@ export const useDashboardData = (initialLoad = true) => {
       }
       
       setFiles(fileData);
-      
-      // Get storage usage
-      try {
-        const usage = await getUserStorageUsage();
-        setStorageUsage({
-          totalSize: usage.totalSize,
-          fileCount: usage.fileCount,
-          limit: usage.limit
-        });
-      } catch (error) {
-        console.error('Error loading storage usage:', error);
-      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
         title: "Error",
-        description: "Failed to load your files and storage information.",
+        description: "Failed to load your files.",
         variant: "destructive"
       });
     } finally {
@@ -158,7 +133,6 @@ export const useDashboardData = (initialLoad = true) => {
     folders,
     currentFolder,
     isLoading,
-    storageUsage,
     searchQuery,
     setSearchQuery,
     loadData,

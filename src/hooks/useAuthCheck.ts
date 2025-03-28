@@ -1,9 +1,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, AuthError, AuthStatus } from '@/lib/auth';
 import { toast } from '@/components/ui/use-toast';
-import { AUTH_CHECK_TIMEOUT } from '@/lib/storage/constants';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useAuthCheck = () => {
   const [authError, setAuthError] = useState<string | null>(null);
@@ -51,8 +51,22 @@ export const useAuthCheck = () => {
       }
     }, 5 * 60 * 1000);
     
-    return () => clearInterval(refreshInterval);
-  }, [checkAuth, lastChecked]);
+    // Set up auth state listener to handle events like token expiration
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event);
+      if (event === 'SIGNED_OUT') {
+        navigate('/login');
+      } else if (event === 'TOKEN_REFRESHED') {
+        // Clear any auth errors when token is refreshed successfully
+        setAuthError(null);
+      }
+    });
+    
+    return () => {
+      clearInterval(refreshInterval);
+      subscription.unsubscribe();
+    };
+  }, [checkAuth, lastChecked, navigate]);
   
   const handleRetry = () => {
     setAuthError(null);

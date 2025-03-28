@@ -1,24 +1,22 @@
 
-import React from 'react';
-import FileListHeader from '@/components/dashboard/FileListHeader';
-import FileList from '@/components/dashboard/FileList';
-import StorageUsageDisplay from '@/components/dashboard/StorageUsageDisplay';
-import FolderManager from '@/components/dashboard/FolderManager';
+import React, { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import FilesSection from './FilesSection';
+import FolderManager from './FolderManager';
+import { SharedFile } from '@/lib/filesharing';
+import { FileMetadata } from '@/lib/storage';
+import { getFilesSharedWithMe } from '@/lib/filesharing';
+import { useEffect } from 'react';
 
 interface DashboardContentProps {
-  files: any[];
+  files: FileMetadata[];
   folders: string[];
   currentFolder: string | null;
   isLoading: boolean;
-  storageUsage: {
-    totalSize: number;
-    fileCount: number;
-    limit: number;
-  };
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
-  onFolderCreate: (folderName: string) => void;
+  onFolderCreate: (name: string) => void;
   onFolderSelect: (folder: string | null) => void;
 }
 
@@ -27,56 +25,49 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   folders,
   currentFolder,
   isLoading,
-  storageUsage,
   searchQuery,
   onSearchChange,
   onRefresh,
   onFolderCreate,
   onFolderSelect
 }) => {
-  const folderLabel = currentFolder ? ` in "${currentFolder}"` : '';
+  const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([]);
+  const [isLoadingShared, setIsLoadingShared] = useState(true);
+  
+  // Load shared files
+  useEffect(() => {
+    const loadSharedFiles = async () => {
+      try {
+        setIsLoadingShared(true);
+        const shared = await getFilesSharedWithMe();
+        setSharedFiles(shared);
+      } catch (error) {
+        console.error("Error loading shared files:", error);
+      } finally {
+        setIsLoadingShared(false);
+      }
+    };
+    
+    loadSharedFiles();
+  }, []);
   
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-      <div className="lg:col-span-1">
-        <FolderManager 
-          folders={folders}
-          currentFolder={currentFolder}
-          onFolderCreate={onFolderCreate}
-          onFolderSelect={onFolderSelect}
-        />
-        
-        <StorageUsageDisplay
-          used={storageUsage.totalSize}
-          limit={storageUsage.limit}
-          fileCount={storageUsage.fileCount}
-        />
-      </div>
+    <div className="space-y-6">
+      <FolderManager 
+        folders={folders}
+        currentFolder={currentFolder}
+        onFolderCreate={onFolderCreate}
+        onFolderSelect={onFolderSelect}
+      />
       
-      <div className="lg:col-span-3">
-        <FileListHeader
-          searchQuery={searchQuery}
-          onSearchChange={onSearchChange}
-          onRefresh={onRefresh}
-          isLoading={isLoading}
-          currentFolder={currentFolder}
-        />
-        <FileList 
-          files={files.map(file => ({
-            id: file.id,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            dateAdded: file.dateAdded,
-            encrypted: file.encrypted,
-            filePath: file.filePath,
-            folder: file.folder
-          }))}
-          isLoading={isLoading}
-          onDeleteComplete={onRefresh}
-          emptyMessage={`No files found${folderLabel}. Upload your first encrypted file.`}
-        />
-      </div>
+      <FilesSection
+        files={files}
+        sharedFiles={sharedFiles}
+        isLoading={isLoading || isLoadingShared}
+        searchTerm={searchQuery}
+        onSearchChange={onSearchChange}
+        onRefresh={onRefresh}
+      />
     </div>
   );
 };
