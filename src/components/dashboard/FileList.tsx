@@ -27,6 +27,8 @@ export interface FileItem {
   encrypted: boolean;
   filePath: string;
   folder?: string;
+  isShared?: boolean;
+  owner?: string;
 }
 
 interface FileListProps {
@@ -35,6 +37,7 @@ interface FileListProps {
   onDownload?: (id: string, filePath: string, name: string, type: string) => void;
   onDelete?: (id: string, filePath: string) => void;
   onDeleteComplete?: () => void;
+  onShare?: (id: string) => void;
   emptyMessage?: string;
 }
 
@@ -44,6 +47,7 @@ const FileList: React.FC<FileListProps> = ({
   onDownload,
   onDelete,
   onDeleteComplete,
+  onShare,
   emptyMessage = "No files found"
 }) => {
   if (isLoading) {
@@ -75,6 +79,7 @@ const FileList: React.FC<FileListProps> = ({
                   onDownload={onDownload}
                   onDelete={onDelete}
                   onDeleteComplete={onDeleteComplete}
+                  onShare={onShare}
                 />
               ))}
             </TableBody>

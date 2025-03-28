@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
@@ -9,6 +8,8 @@ import { useSearch } from '@/hooks/useSearch';
 import { toast } from '@/components/ui/use-toast';
 import { AlertCircle } from 'lucide-react';
 import { FileItem } from './FileList';
+import { useState as useReactState } from 'react';
+import ShareFileDialog from './ShareFileDialog';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -30,8 +31,9 @@ const FilesSection: React.FC<FilesSectionProps> = ({
   const [activeTab, setActiveTab] = useState<'my-files' | 'shared-with-me'>('my-files');
   const { filterBySearchTerm, searchError } = useSearch();
   const [filterError, setFilterError] = useState<Error | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useReactState(false);
+  const [selectedFile, setSelectedFile] = useReactState<{ id: string; name: string; path: string } | null>(null);
   
-  // Show toast for search errors
   useEffect(() => {
     if (searchError) {
       toast({
@@ -42,7 +44,6 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     }
   }, [searchError]);
   
-  // Safe filtering with error handling
   const safeFilter = <T extends object>(
     items: T[] | undefined | null,
     searchValue: string,
@@ -59,21 +60,30 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     }
   };
   
-  // Filter files based on search term, using original_name property
+  const handleShareFile = (id: string) => {
+    const fileToShare = adaptedFiles.find(file => file.id === id);
+    if (fileToShare) {
+      setSelectedFile({
+        id: fileToShare.id,
+        name: fileToShare.name,
+        path: fileToShare.filePath
+      });
+      setShareDialogOpen(true);
+    }
+  };
+  
   const filteredFiles = safeFilter(
     files, 
     searchTerm, 
     (file) => file.original_name
   );
   
-  // Filter shared files based on search term, using original_name property
   const filteredSharedFiles = safeFilter(
     sharedFiles, 
     searchTerm, 
     (file) => file.original_name
   );
 
-  // Convert FileMetadata to FileItem using correct properties
   const adaptedFiles = filteredFiles.map(file => {
     try {
       return {
@@ -84,7 +94,8 @@ const FilesSection: React.FC<FilesSectionProps> = ({
         dateAdded: file.created_at,
         encrypted: file.encrypted,
         filePath: file.file_path,
-        folder: file.file_path.includes('/') ? file.file_path.split('/')[0] : undefined
+        folder: file.file_path.includes('/') ? file.file_path.split('/')[0] : undefined,
+        isShared: false
       } as FileItem;
     } catch (error) {
       console.error("Error adapting file metadata:", file, error);
@@ -92,7 +103,6 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     }
   }).filter(Boolean) as FileItem[];
   
-  // Convert SharedFile to FileItem using correct properties
   const adaptedSharedFiles = filteredSharedFiles.map(file => {
     try {
       return {
@@ -112,7 +122,6 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     }
   }).filter(Boolean) as FileItem[];
 
-  // If there's a filter error, show an error message
   if (filterError) {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-destructive/10 rounded-lg">
@@ -152,6 +161,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
             files={adaptedFiles}
             isLoading={isLoading}
             onDeleteComplete={onRefresh}
+            onShare={handleShareFile}
             emptyMessage="No files found. Upload your first encrypted file."
           />
         </TabsContent>
@@ -165,6 +175,15 @@ const FilesSection: React.FC<FilesSectionProps> = ({
           />
         </TabsContent>
       </Tabs>
+      
+      {selectedFile && (
+        <ShareFileDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          filePath={selectedFile.path}
+          fileName={selectedFile.name}
+        />
+      )}
     </div>
   );
 };
