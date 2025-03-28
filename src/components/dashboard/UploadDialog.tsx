@@ -53,9 +53,14 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProp
       const quota = await getStorageQuota();
       
       if (usage && quota) {
-        const percentUsed = (usage.totalSize / quota) * 100;
-        const formattedUsed = formatBytes(usage.totalSize);
-        const formattedAvailable = formatBytes(quota - usage.totalSize);
+        // Ensure both values are numbers before performing arithmetic
+        const usageSize = typeof usage.totalSize === 'number' ? usage.totalSize : 0;
+        const quotaSize = typeof quota === 'number' ? quota : 0;
+        
+        // Calculate percentage and ensure it's a number
+        const percentUsed = quotaSize > 0 ? (usageSize / quotaSize) * 100 : 0;
+        const formattedUsed = formatBytes(usageSize);
+        const formattedAvailable = formatBytes(quotaSize - usageSize);
         
         setStorageQuota({
           percentUsed,
