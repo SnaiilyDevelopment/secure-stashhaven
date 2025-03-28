@@ -22,7 +22,7 @@ BEGIN
     fs.file_path = file_path_param
     AND fs.owner_id = owner_id_param;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Remove file access procedure
 CREATE OR REPLACE FUNCTION remove_file_access(share_id_param UUID, owner_id_param UUID)
@@ -41,7 +41,7 @@ BEGIN
   
   RETURN success;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Get files shared with me procedure
 CREATE OR REPLACE FUNCTION get_files_shared_with_me(recipient_id_param UUID)
@@ -75,7 +75,7 @@ BEGIN
   WHERE 
     fs.recipient_id = recipient_id_param;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Share file with user procedure
 CREATE OR REPLACE FUNCTION share_file_with_user(
@@ -127,4 +127,15 @@ BEGIN
     RETURN QUERY SELECT v_share_id;
   END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Create profile for user procedure
+CREATE OR REPLACE FUNCTION create_profile_for_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email)
+  VALUES (NEW.id, NEW.email)
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;

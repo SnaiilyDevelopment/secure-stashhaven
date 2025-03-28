@@ -25,8 +25,8 @@ export const loginUser = async (email: string, password: string): Promise<boolea
       return false;
     }
     
-    const salt = data.user.user_metadata.salt;
-    const encryptedMasterKey = data.user.user_metadata.encryptedMasterKey;
+    const salt = data.user.user_metadata?.salt;
+    const encryptedMasterKey = data.user.user_metadata?.encryptedMasterKey;
     
     if (!salt || !encryptedMasterKey) {
       console.error("Missing user metadata:", { salt, encryptedMasterKey });

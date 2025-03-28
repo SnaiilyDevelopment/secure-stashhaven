@@ -43,14 +43,6 @@ export const useAuthCheck = () => {
     // Initialize auth check
     checkAuth();
     
-    // Set interval to periodically check auth (every 5 minutes)
-    const refreshInterval = setInterval(() => {
-      // Only refresh if it's been more than 4 minutes since last check
-      if (Date.now() - lastChecked > 4 * 60 * 1000) {
-        checkAuth();
-      }
-    }, 5 * 60 * 1000);
-    
     // Set up auth state listener to handle events like token expiration
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth state changed:", event);
@@ -59,8 +51,19 @@ export const useAuthCheck = () => {
       } else if (event === 'TOKEN_REFRESHED') {
         // Clear any auth errors when token is refreshed successfully
         setAuthError(null);
+      } else if (event === 'USER_UPDATED') {
+        // Force auth check when user is updated
+        checkAuth();
       }
     });
+    
+    // Set interval to periodically check auth (every 5 minutes)
+    const refreshInterval = setInterval(() => {
+      // Only refresh if it's been more than 4 minutes since last check
+      if (Date.now() - lastChecked > 4 * 60 * 1000) {
+        checkAuth();
+      }
+    }, 5 * 60 * 1000);
     
     return () => {
       clearInterval(refreshInterval);

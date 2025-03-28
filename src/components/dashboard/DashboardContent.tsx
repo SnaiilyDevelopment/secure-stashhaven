@@ -7,6 +7,9 @@ import { SharedFile } from '@/lib/filesharing';
 import { FileMetadata } from '@/lib/storage';
 import { getFilesSharedWithMe } from '@/lib/filesharing';
 import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import UploadDialog from './UploadDialog';
 
 interface DashboardContentProps {
   files: FileMetadata[];
@@ -33,6 +36,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 }) => {
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([]);
   const [isLoadingShared, setIsLoadingShared] = useState(true);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   
   // Load shared files
   useEffect(() => {
@@ -53,12 +57,22 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   
   return (
     <div className="space-y-6">
-      <FolderManager 
-        folders={folders}
-        currentFolder={currentFolder}
-        onFolderCreate={onFolderCreate}
-        onFolderSelect={onFolderSelect}
-      />
+      <div className="flex justify-between items-center">
+        <FolderManager 
+          folders={folders}
+          currentFolder={currentFolder}
+          onFolderCreate={onFolderCreate}
+          onFolderSelect={onFolderSelect}
+        />
+        
+        <Button 
+          onClick={() => setIsUploadDialogOpen(true)} 
+          className="flex items-center gap-1"
+        >
+          <Plus className="h-4 w-4" />
+          Upload File
+        </Button>
+      </div>
       
       <FilesSection
         files={files}
@@ -67,6 +81,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         searchTerm={searchQuery}
         onSearchChange={onSearchChange}
         onRefresh={onRefresh}
+      />
+      
+      <UploadDialog 
+        open={isUploadDialogOpen} 
+        onOpenChange={setIsUploadDialogOpen}
+        onUploadComplete={onRefresh}
       />
     </div>
   );
