@@ -43,70 +43,31 @@ export const useAuthCheck = () => {
     // Initialize auth check
     checkAuth();
     
-    // Set up auth state listener with initialization timeout handling
+    // Set up auth state listener to handle events like token expiration
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth state changed:", event);
-      
-      switch (event) {
-        case 'SIGNED_OUT':
-          navigate('/login');
-          break;
-        case 'TOKEN_REFRESHED':
-          setAuthError(null);
-          break;
-        case 'USER_UPDATED':
-          checkAuth();
-          break;
-        case 'INITIAL_SESSION':
-          if (!session) {
-            console.log("Initial session check timed out, retrying...");
-            setTimeout(() => checkAuth(), 5000); // Retry after 5 seconds
-          }
-          break;
+      if (event === 'SIGNED_OUT') {
+        navigate('/login');
+      } else if (event === 'TOKEN_REFRESHED') {
+        // Clear any auth errors when token is refreshed successfully
+        setAuthError(null);
+      } else if (event === 'USER_UPDATED') {
+        // Force auth check when user is updated
+        checkAuth();
       }
     });
-
-    // Initial check with retry logic
-    const initialCheck = async () => {
-      try {
-        await checkAuth();
-      } catch (error) {
-        console.log("Initial auth check failed, retrying...", error);
-        setTimeout(() => initialCheck(), 5000); // Retry after 5 seconds
-      }
-    };
-    initialCheck();
     
-    // Optimized keep-alive with debouncing (every 2 minutes)
-    const keepAliveInterval = setInterval(() => {
-      const now = Date.now();
-      // Only refresh if it's been more than 90 seconds since last successful check
-      if (now - lastChecked > 90 * 1000) {
-        supabase.auth.getSession()
-          .then(({ data }) => {
-            if (data.session) {
-              console.debug("Session keep-alive successful");
-              setLastChecked(now);
-            }
-          })
-          .catch(error => {
-            console.debug("Keep-alive check failed:", error);
-            // Retry after 30 seconds on failure
-            setTimeout(() => {
-              supabase.auth.getSession()
-                .then(({ data }) => {
-                  if (data.session) {
-                    setLastChecked(Date.now());
-                  }
-                });
-            }, 30000);
-          });
+    // Set interval to periodically check auth (every 5 minutes)
+    const refreshInterval = setInterval(() => {
+      // Only refresh if it's been more than 4 minutes since last check
+      if (Date.now() - lastChecked > 4 * 60 * 1000) {
+        checkAuth();
       }
-    }, 120 * 1000);
+    }, 5 * 60 * 1000);
     
     return () => {
-      clearInterval(keepAliveInterval);
-      subscription?.unsubscribe();
+      clearInterval(refreshInterval);
+      subscription.unsubscribe();
     };
   }, [checkAuth, lastChecked, navigate]);
   
