@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { encryptFile, decryptFile, getCurrentUserEncryptionKey } from "../encryption";
@@ -61,13 +60,10 @@ export const uploadEncryptedFile = async (
         cacheControl: '3600',
         upsert: false,
         contentType: 'application/encrypted',
-        onUploadProgress: (progress) => {
-          // Map the progress from 40-80%
-          const uploadProgressPercent = progress.percent || 0;
-          const overallProgress = 40 + (uploadProgressPercent * 0.4);
-          onProgress?.(overallProgress);
-        },
       });
+    
+    // Handle progress updates manually since Supabase doesn't directly support onUploadProgress
+    onProgress?.(80); // Upload complete
     
     if (error) {
       console.error("File upload error:", error);
@@ -77,27 +73,6 @@ export const uploadEncryptedFile = async (
         variant: "destructive"
       });
       return null;
-    }
-    
-    onProgress?.(80); // Upload complete
-    
-    // Save metadata to user's file list
-    try {
-      const { error: metadataError } = await supabase
-        .from('file_metadata')
-        .insert({
-          file_path: data.path,
-          original_name: file.name,
-          original_type: file.type,
-          size: file.size,
-          encrypted: true
-        });
-      
-      if (metadataError) {
-        console.error("Metadata storage error:", metadataError);
-      }
-    } catch (metadataError) {
-      console.error("Metadata insertion error:", metadataError);
     }
     
     onProgress?.(100); // Process complete

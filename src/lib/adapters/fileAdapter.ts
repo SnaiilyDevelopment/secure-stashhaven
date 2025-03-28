@@ -15,6 +15,7 @@ export interface FileItemAdapter {
   encrypted: boolean;
   isShared?: boolean;
   owner?: string;
+  filePath: string; // Add this property to match FileItem interface
 }
 
 /**
@@ -28,7 +29,8 @@ export const adaptFileMetadataToFileItem = (file: FileMetadata): FileItemAdapter
     type: file.original_type,
     encryptedType: 'application/encrypted',
     dateAdded: file.created_at,
-    encrypted: file.encrypted
+    encrypted: file.encrypted,
+    filePath: file.file_path // Add this property mapping
   };
 };
 
@@ -45,6 +47,7 @@ export const adaptSharedFileToFileItem = (file: SharedFile): FileItemAdapter => 
     dateAdded: file.shared_at,
     encrypted: true,
     isShared: true,
-    owner: file.owner_email
+    owner: file.owner_email,
+    filePath: file.file_path // Add this property mapping
   };
 };
