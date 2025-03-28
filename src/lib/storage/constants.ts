@@ -7,4 +7,5 @@ export const ALLOWED_FILE_TYPES: string | string[] = '*/*';
 
 // Authentication timeouts
 export const AUTH_CHECK_TIMEOUT = 15000; // Increased from previous value to prevent timeouts
-export const AUTH_CHECK_FAST_TIMEOUT = 5000; // Fast path timeout for quick auth checks
+export const AUTH_CHECK_FAST_TIMEOUT = 7500; // Increased from lower value
+export const LOGIN_TIMEOUT = 20000; // Increased for better reliability

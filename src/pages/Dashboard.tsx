@@ -1,42 +1,68 @@
 
-import React from 'react';
-import ThreeDLayout from '@/components/layout/3DLayout';
+import React, { useState, useEffect } from 'react';
+import MainLayout from '@/components/layout/MainLayout';
+import { useAuthCheck } from '@/hooks/useAuthCheck';
+import AuthErrorAlert from '@/components/dashboard/AuthErrorAlert';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import DashboardContent from '@/components/dashboard/DashboardContent';
-import AuthErrorAlert from '@/components/dashboard/AuthErrorAlert';
-import { useAuthCheck } from '@/hooks/useAuthCheck';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { FileItem } from '@/components/dashboard/FileList';
 
 const Dashboard = () => {
-  const { authError, handleRetry } = useAuthCheck();
   const { 
     filteredFiles, 
-    folders,
-    currentFolder,
+    folders, 
+    currentFolder, 
     isLoading, 
     searchQuery, 
     setSearchQuery, 
-    loadData,
-    createFolder,
-    selectFolder
-  } = useDashboardData();
+    loadData, 
+    createFolder, 
+    selectFolder 
+  } = useDashboardData(true);
   
-  const handleRetryWithRefresh = () => {
-    handleRetry();
-    loadData();
-  };
-
+  const { authError, handleRetry, isCheckingAuth } = useAuthCheck();
+  
+  // Track total storage used
+  const [storageUsed, setStorageUsed] = useState<number>(0);
+  
+  // Update storage used whenever files change
+  useEffect(() => {
+    if (!isLoading && !isCheckingAuth) {
+      // Calculate total storage used
+      const totalSize = filteredFiles.reduce((total, file) => {
+        return total + (file.size || 0);
+      }, 0);
+      
+      setStorageUsed(totalSize);
+    }
+  }, [filteredFiles, isLoading, isCheckingAuth]);
+  
+  if (isCheckingAuth) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto py-6 max-w-6xl">
+          <div className="flex justify-center items-center h-[60vh]">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin mb-4"></div>
+              <p className="text-muted-foreground">Verifying credentials...</p>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+  
   return (
-    <ThreeDLayout>
-      <div className="container py-8 animate-fade-in">
-        <DashboardHeader 
-          title="My Secure Vault"
-          subtitle="All files are end-to-end encrypted"
-        />
-
+    <MainLayout>
+      <div className="container mx-auto py-6 max-w-6xl">
         <AuthErrorAlert 
-          error={authError} 
-          onRetry={handleRetryWithRefresh} 
+          error={authError}
+          onRetry={handleRetry}
+        />
+        
+        <DashboardHeader
+          storageUsed={storageUsed}
         />
         
         <DashboardContent 
@@ -51,7 +77,7 @@ const Dashboard = () => {
           onFolderSelect={selectFolder}
         />
       </div>
-    </ThreeDLayout>
+    </MainLayout>
   );
 };
 
