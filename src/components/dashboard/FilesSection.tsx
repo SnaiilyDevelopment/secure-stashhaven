@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileList from './FileList';
@@ -6,10 +7,11 @@ import { FileMetadata } from '@/lib/storage';
 import { SharedFile } from '@/lib/filesharing';
 import { useSearch } from '@/hooks/useSearch';
 import { toast } from '@/components/ui/use-toast';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Upload } from 'lucide-react';
 import { FileItem } from './FileList';
 import { useState as useReactState } from 'react';
 import ShareFileDialog from './ShareFileDialog';
+import UploadDialog from './UploadDialog';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -18,6 +20,7 @@ interface FilesSectionProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
+  onFolderCreate?: (name: string) => void;
 }
 
 const FilesSection: React.FC<FilesSectionProps> = ({
@@ -26,13 +29,16 @@ const FilesSection: React.FC<FilesSectionProps> = ({
   isLoading,
   searchTerm,
   onSearchChange,
-  onRefresh
+  onRefresh,
+  onFolderCreate
 }) => {
   const [activeTab, setActiveTab] = useState<'my-files' | 'shared-with-me'>('my-files');
   const { filterBySearchTerm, searchError } = useSearch();
   const [filterError, setFilterError] = useState<Error | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useReactState(false);
   const [selectedFile, setSelectedFile] = useReactState<{ id: string; name: string; path: string } | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   useEffect(() => {
     if (searchError) {
@@ -43,6 +49,26 @@ const FilesSection: React.FC<FilesSectionProps> = ({
       });
     }
   }, [searchError]);
+  
+  // Drag and drop handlers for the entire dashboard
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    setUploadDialogOpen(true);
+  };
   
   const safeFilter = <T extends object>(
     items: T[] | undefined | null,
@@ -70,6 +96,10 @@ const FilesSection: React.FC<FilesSectionProps> = ({
       });
       setShareDialogOpen(true);
     }
+  };
+  
+  const handleUploadDialogOpen = () => {
+    setUploadDialogOpen(true);
   };
   
   const filteredFiles = safeFilter(
@@ -142,7 +172,24 @@ const FilesSection: React.FC<FilesSectionProps> = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div 
+      className={`space-y-4 relative min-h-[400px] rounded-lg transition-all duration-200 ${
+        isDragging ? 'ring-2 ring-green-500 bg-green-50/30 before:absolute before:inset-0 before:z-10' : ''
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 flex items-center justify-center bg-green-50/80 backdrop-blur-sm z-20 rounded-lg border-2 border-dashed border-green-500">
+          <div className="text-center p-8 rounded-xl">
+            <Upload className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-green-700 mb-2">Drop files to upload</h3>
+            <p className="text-green-600">Files will be encrypted and secured in your vault</p>
+          </div>
+        </div>
+      )}
+
       <SearchBar value={searchTerm} onChange={onSearchChange} />
       
       <Tabs 
@@ -160,9 +207,11 @@ const FilesSection: React.FC<FilesSectionProps> = ({
           <FileList 
             files={adaptedFiles}
             isLoading={isLoading}
+            onUpload={handleUploadDialogOpen}
             onDeleteComplete={onRefresh}
             onShare={handleShareFile}
             emptyMessage="No files found. Upload your first encrypted file."
+            isDropTarget={true}
           />
         </TabsContent>
         
@@ -184,6 +233,13 @@ const FilesSection: React.FC<FilesSectionProps> = ({
           fileName={selectedFile.name}
         />
       )}
+      
+      <UploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onUploadComplete={onRefresh}
+        onFolderCreate={onFolderCreate}
+      />
     </div>
   );
 };
