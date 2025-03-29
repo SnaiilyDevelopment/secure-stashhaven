@@ -9,9 +9,7 @@ import { useSearch } from '@/hooks/useSearch';
 import { toast } from '@/components/ui/use-toast';
 import { AlertCircle, Upload } from 'lucide-react';
 import { FileItem } from './FileList';
-import { useState as useReactState } from 'react';
 import ShareFileDialog from './ShareFileDialog';
-import UploadDialog from './UploadDialog';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -21,6 +19,7 @@ interface FilesSectionProps {
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
   onFolderCreate?: (name: string) => void;
+  onUploadDialogOpen: () => void;
 }
 
 const FilesSection: React.FC<FilesSectionProps> = ({
@@ -30,14 +29,14 @@ const FilesSection: React.FC<FilesSectionProps> = ({
   searchTerm,
   onSearchChange,
   onRefresh,
-  onFolderCreate
+  onFolderCreate,
+  onUploadDialogOpen
 }) => {
   const [activeTab, setActiveTab] = useState<'my-files' | 'shared-with-me'>('my-files');
   const { filterBySearchTerm, searchError } = useSearch();
   const [filterError, setFilterError] = useState<Error | null>(null);
-  const [shareDialogOpen, setShareDialogOpen] = useReactState(false);
-  const [selectedFile, setSelectedFile] = useReactState<{ id: string; name: string; path: string } | null>(null);
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<{ id: string; name: string; path: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   
   useEffect(() => {
@@ -67,7 +66,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    setUploadDialogOpen(true);
+    onUploadDialogOpen();
   };
   
   const safeFilter = <T extends object>(
@@ -96,10 +95,6 @@ const FilesSection: React.FC<FilesSectionProps> = ({
       });
       setShareDialogOpen(true);
     }
-  };
-  
-  const handleUploadDialogOpen = () => {
-    setUploadDialogOpen(true);
   };
   
   const filteredFiles = safeFilter(
@@ -207,7 +202,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
           <FileList 
             files={adaptedFiles}
             isLoading={isLoading}
-            onUpload={handleUploadDialogOpen}
+            onUpload={onUploadDialogOpen}
             onDeleteComplete={onRefresh}
             onShare={handleShareFile}
             emptyMessage="No files found. Upload your first encrypted file."
@@ -233,13 +228,6 @@ const FilesSection: React.FC<FilesSectionProps> = ({
           fileName={selectedFile.name}
         />
       )}
-      
-      <UploadDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
-        onUploadComplete={onRefresh}
-        onFolderCreate={onFolderCreate}
-      />
     </div>
   );
 };

@@ -6,30 +6,51 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, Folder, FolderPlus } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
-import { uploadEncryptedFile } from '@/lib/storage/fileOperations';
-import { ensureStorageBucket, validateFile, hasEnoughStorageSpace, getUserStorageUsage, getStorageQuota } from '@/lib/storage/storageUtils';
-import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
-import { useDashboardData } from '@/hooks/useDashboardData';
-import StorageQuotaDisplay from './upload/StorageQuotaDisplay';
-import FilePreview from './upload/FilePreview';
-import UploadProgress from './upload/UploadProgress';
-import FolderSelector from './upload/FolderSelector';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { 
+  Upload as UploadIcon, 
+  Folder as FolderIcon, 
+  FolderPlus, 
+  AlertCircle 
+} from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { 
+  uploadEncryptedFile,
+  ensureStorageBucket,
+  getUserStorageUsage,
+  formatBytes
+} from '@/lib/storage';
+import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
+import { validateFile, isFileSizeWithinLimit } from '@/lib/storage/utils/validationUtils';
+import UploadProgress from './upload/UploadProgress';
+import FilePreview from './upload/FilePreview';
+import StorageQuotaDisplay from './upload/StorageQuotaDisplay';
+import FolderSelector from './upload/FolderSelector';
 
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUploadComplete?: () => void;
-  onFolderCreate?: (name: string) => void;
+  onFolderCreate?: (folderName: string) => void;
+  initialAction?: 'file' | 'folder' | 'new-folder';
 }
 
-const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: UploadDialogProps) => {
+const UploadDialog: React.FC<UploadDialogProps> = ({ 
+  open, 
+  onOpenChange, 
+  onUploadComplete,
+  onFolderCreate,
+  initialAction = 'file' 
+}) => {
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -55,17 +76,20 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
   // Fetch storage quota data when dialog opens
   useEffect(() => {
     if (open) {
-      fetchStorageQuota();
-      setSelectedFile(null);
-      setSelectedFiles([]);
-      setUploadProgress(0);
-      setUploadError(null);
-      setIsUploading(false);
-      setIsDragging(false);
+      loadStorageQuota();
+      
+      // Set the active tab based on initialAction
+      if (initialAction === 'file') {
+        setActiveTab('upload-file');
+      } else if (initialAction === 'folder') {
+        setActiveTab('upload-folder');
+      } else if (initialAction === 'new-folder') {
+        setActiveTab('create-folder');
+      }
     }
-  }, [open]);
+  }, [open, initialAction]);
   
-  const fetchStorageQuota = async () => {
+  const loadStorageQuota = async () => {
     try {
       const usage = await getUserStorageUsage();
       const quota = await getStorageQuota();
@@ -309,31 +333,34 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
   };
   
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      onOpenChange(isOpen);
+      if (!isOpen) resetState();
+    }}>
       <DialogContent 
-        className="sm:max-w-md"
+        className="sm:max-w-[500px]"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         <DialogHeader>
-          <DialogTitle>Upload & Manage Files</DialogTitle>
+          <DialogTitle>Add to Secure Vault</DialogTitle>
           <DialogDescription>
-            Upload files or create folders in your secure vault. All files are end-to-end encrypted.
+            Upload files or create folders in your encrypted storage.
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="upload-file" className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upload-file" className="flex items-center gap-1">
+              <UploadIcon className="h-4 w-4" />
               <span>File</span>
             </TabsTrigger>
-            <TabsTrigger value="upload-folder" className="flex items-center gap-2">
-              <Folder className="h-4 w-4" />
+            <TabsTrigger value="upload-folder" className="flex items-center gap-1">
+              <FolderIcon className="h-4 w-4" />
               <span>Folder</span>
             </TabsTrigger>
-            <TabsTrigger value="create-folder" className="flex items-center gap-2">
+            <TabsTrigger value="create-folder" className="flex items-center gap-1">
               <FolderPlus className="h-4 w-4" />
               <span>New Folder</span>
             </TabsTrigger>
@@ -373,7 +400,7 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
                     onClick={selectedFiles.length === 1 ? handleUploadSingleFile : handleUploadMultipleFiles} 
                     className="w-full"
                   >
-                    <Upload className="h-4 w-4 mr-2" />
+                    <UploadIcon className="h-4 w-4 mr-2" />
                     Upload {selectedFiles.length > 1 ? `${selectedFiles.length} Files` : 'File'}
                   </Button>
                 )}
@@ -394,7 +421,7 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
                           : 'border-green-300 bg-green-50 hover:bg-green-100'}`}
                     >
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-10 h-10 mb-3 text-green-500" />
+                        <UploadIcon className="w-10 h-10 mb-3 text-green-500" />
                         <p className="mb-2 text-sm text-green-700">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
@@ -445,7 +472,7 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
                     onClick={handleUploadMultipleFiles} 
                     className="w-full"
                   >
-                    <Upload className="h-4 w-4 mr-2" />
+                    <UploadIcon className="h-4 w-4 mr-2" />
                     Upload Folder Contents
                   </Button>
                 )}
@@ -461,7 +488,7 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
                       className="flex flex-col items-center justify-center w-full h-44 border-2 border-green-300 border-dashed rounded-lg cursor-pointer bg-green-50 hover:bg-green-100 transition-colors"
                     >
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Folder className="w-10 h-10 mb-3 text-green-500" />
+                        <FolderIcon className="w-10 h-10 mb-3 text-green-500" />
                         <p className="mb-2 text-sm text-green-700">
                           <span className="font-semibold">Select a folder</span> to upload
                         </p>
@@ -487,7 +514,7 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
                   onClick={triggerFolderInput}
                   className="w-full"
                 >
-                  <Folder className="h-4 w-4 mr-2" />
+                  <FolderIcon className="h-4 w-4 mr-2" />
                   Select Folder
                 </Button>
               </div>

@@ -1,13 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FilesSection from './FilesSection';
 import FolderManager from './FolderManager';
 import { SharedFile } from '@/lib/filesharing';
 import { FileMetadata } from '@/lib/storage';
 import { getFilesSharedWithMe } from '@/lib/filesharing';
-import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Upload, Folder, FolderPlus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import UploadDialog from './UploadDialog';
 import { 
   DropdownMenu,
@@ -15,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import AddContentActions from './actions/AddContentActions';
 
 interface DashboardContentProps {
   files: FileMetadata[];
@@ -76,37 +76,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
           onFolderSelect={onFolderSelect}
         />
         
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="flex items-center gap-1">
-              <Plus className="h-4 w-4" />
-              Add New
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleOpenUploadDialog('file')}
-            >
-              <Upload className="h-4 w-4" />
-              <span>Upload File</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleOpenUploadDialog('folder')}
-            >
-              <Folder className="h-4 w-4" />
-              <span>Upload Folder</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleOpenUploadDialog('new-folder')}
-            >
-              <FolderPlus className="h-4 w-4" />
-              <span>Create Folder</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <AddContentActions onActionSelect={handleOpenUploadDialog} />
       </div>
       
       <FilesSection
@@ -117,6 +87,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         onSearchChange={onSearchChange}
         onRefresh={onRefresh}
         onFolderCreate={onFolderCreate}
+        onUploadDialogOpen={() => setIsUploadDialogOpen(true)}
       />
       
       <UploadDialog 
@@ -124,6 +95,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         onOpenChange={setIsUploadDialogOpen}
         onUploadComplete={onRefresh}
         onFolderCreate={onFolderCreate}
+        initialAction={uploadDialogAction}
       />
     </div>
   );
