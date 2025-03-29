@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
@@ -72,11 +71,9 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
       const quota = await getStorageQuota();
       
       if (usage && quota) {
-        // Ensure both values are numbers before performing arithmetic
         const usageSize = typeof usage.totalSize === 'number' ? usage.totalSize : 0;
         const quotaSize = typeof quota === 'number' ? quota : 0;
         
-        // Calculate percentage and ensure it's a number
         const percentUsed = quotaSize > 0 ? (usageSize / quotaSize) * 100 : 0;
         const formattedUsed = formatBytes(usageSize);
         const formattedAvailable = formatBytes(quotaSize - usageSize);
@@ -143,7 +140,6 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
     setUploadProgress(0);
     
     try {
-      // Validate file before upload
       const fileValidation = validateFile(selectedFile);
       if (!fileValidation.valid) {
         toast({
@@ -155,7 +151,6 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
         return;
       }
       
-      // Check storage space
       const hasSpace = await hasEnoughStorageSpace(selectedFile.size);
       if (!hasSpace) {
         toast({
@@ -167,10 +162,8 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
         return;
       }
       
-      // Create bucket if it doesn't exist
       await ensureStorageBucket(STORAGE_BUCKET_NAME);
       
-      // Upload the file with folder information
       const filePath = await uploadEncryptedFile(
         selectedFile,
         STORAGE_BUCKET_NAME,
@@ -179,14 +172,12 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
       );
       
       if (filePath) {
-        // Upload successful
         setTimeout(() => {
           onUploadComplete?.();
           onOpenChange(false);
           resetState();
         }, 1000);
       } else {
-        // Upload failed
         setUploadError('Failed to upload file. Please try again.');
       }
     } catch (error) {
@@ -197,7 +188,6 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
     }
   };
   
-  // Upload multiple files in sequence
   const handleUploadMultipleFiles = async () => {
     if (selectedFiles.length === 0) return;
     
@@ -205,7 +195,6 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
     setUploadProgress(0);
     
     try {
-      // Create bucket if it doesn't exist
       await ensureStorageBucket(STORAGE_BUCKET_NAME);
       
       let successCount = 0;
@@ -216,13 +205,11 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
         const fileProgress = i / totalFiles * 100;
         setUploadProgress(fileProgress);
         
-        // Validate file
         const fileValidation = validateFile(file);
         if (!fileValidation.valid) {
           continue;
         }
         
-        // Check storage space
         const hasSpace = await hasEnoughStorageSpace(file.size);
         if (!hasSpace) {
           toast({
@@ -233,7 +220,6 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
           break;
         }
         
-        // Upload the file
         const filePath = await uploadEncryptedFile(
           file,
           STORAGE_BUCKET_NAME,
@@ -252,13 +238,11 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
       
       setUploadProgress(100);
       
-      // Display result
       toast({
         title: "Upload complete",
         description: `Successfully uploaded ${successCount} of ${totalFiles} files.`
       });
       
-      // Close dialog
       setTimeout(() => {
         onUploadComplete?.();
         onOpenChange(false);
@@ -489,9 +473,11 @@ const UploadDialog = ({ open, onOpenChange, onUploadComplete, onFolderCreate }: 
                         type="file"
                         className="hidden"
                         onChange={handleFolderChange}
-                        webkitdirectory="true"
-                        directory=""
-                        multiple
+                        {...{
+                          webkitdirectory: "",
+                          directory: "",
+                          multiple: true
+                        } as CustomInputHTMLAttributes}
                       />
                     </label>
                   </div>
