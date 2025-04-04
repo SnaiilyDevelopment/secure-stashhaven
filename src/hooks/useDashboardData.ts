@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { listUserFiles, FileMetadata } from '@/lib/storage';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
 
 export const useDashboardData = (initialLoad = true) => {

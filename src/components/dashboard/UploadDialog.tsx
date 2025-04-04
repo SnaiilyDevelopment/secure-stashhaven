@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
@@ -6,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogClose
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,19 +24,27 @@ import {
   FolderPlus, 
   AlertCircle 
 } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { 
   uploadEncryptedFile,
   ensureStorageBucket,
   getUserStorageUsage,
-  formatBytes
 } from '@/lib/storage';
 import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
-import { validateFile, isFileSizeWithinLimit } from '@/lib/storage/utils/validationUtils';
+import { validateFile } from '@/lib/storage/utils/validationUtils';
 import UploadProgress from './upload/UploadProgress';
 import FilePreview from './upload/FilePreview';
 import StorageQuotaDisplay from './upload/StorageQuotaDisplay';
 import FolderSelector from './upload/FolderSelector';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { getStorageQuota, hasEnoughStorageSpace, formatBytes } from '@/lib/storage/utils/storageQuotaUtils';
+
+// Define custom attributes for file input
+interface CustomInputHTMLAttributes {
+  webkitdirectory?: string;
+  directory?: string;
+  multiple?: boolean;
+}
 
 interface UploadDialogProps {
   open: boolean;
@@ -71,6 +81,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     formattedAvailable: string;
   } | null>(null);
   
+  const { toast } = useToast();
   const { folders } = useDashboardData(false);
   
   // Fetch storage quota data when dialog opens
@@ -558,13 +569,3 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
 };
 
 export default UploadDialog;
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
