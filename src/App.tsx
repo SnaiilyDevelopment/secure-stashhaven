@@ -3,8 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -12,10 +11,10 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import { isAuthenticated, handleAuthError, AuthStatus } from "./lib/auth";
-import { supabase } from "./integrations/supabase/client";
-import { toast } from "./components/ui/use-toast";
-import { AUTH_CHECK_TIMEOUT, AUTH_CHECK_FAST_TIMEOUT } from "./lib/storage/constants";
+import { toast } from "./hooks/use-toast";
+import AuthHandler from "./components/auth/AuthHandler";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { AuthProvider } from "./contexts/AuthContext";
 
 // Create a custom error handler for the query client
 const queryErrorHandler = (error: unknown) => {
@@ -46,288 +45,39 @@ const queryClient = new QueryClient({
   },
 });
 
-// Handle the OAuth redirect and hash fragment
-const AuthHandler = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    // Check if we have a hash in the URL (from OAuth redirect)
-    if (location.hash) {
-      console.log("Processing OAuth redirect with hash params");
-      
-      // Let Supabase handle the hash and session setup
-      supabase.auth.getSession().then(({ data, error }) => {
-        if (error) {
-          console.error("Error processing OAuth session:", error);
-          toast({
-            title: "Authentication error",
-            description: "Failed to complete authentication. Please try again.",
-            variant: "destructive"
-          });
-        } else if (data.session) {
-          try {
-            // Generate and store encryption key for OAuth users
-            const encryptionKey = btoa(String.fromCharCode(
-              ...new Uint8Array(crypto.getRandomValues(new Uint8Array(32)))
-            ));
-            localStorage.setItem('encryption_key', encryptionKey);
-            
-            console.log("Successfully processed OAuth redirect");
-            navigate('/dashboard', { replace: true });
-          } catch (e) {
-            console.error("Error generating encryption key:", e);
-            toast({
-              title: "Error setting up encryption",
-              description: "There was a problem securing your account. Please try again.",
-              variant: "destructive"
-            });
-          }
-        }
-      });
-    }
-  }, [location, navigate]);
-
-  return null;
-};
-
 const App = () => {
-  const [isReady, setIsReady] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
-  
-  useEffect(() => {
-    let subscription: { unsubscribe: () => void } | null = null;
-    let isMounted = true;
-    
-    // Set up auth state listener first
-    const setupAuthListener = async () => {
-      try {
-        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log("Auth state changed:", event, session ? "User logged in" : "No session");
-          
-          if (!isMounted) return;
-          
-          try {
-            // For OAuth logins, generate and store encryption key when user first signs in
-            if (session && !localStorage.getItem('encryption_key') && 
-                (session.user?.app_metadata?.provider === 'github' || 
-                session.user?.app_metadata?.provider === 'google')) {
-              
-              console.log("OAuth login detected, generating encryption key");
-              // Create a random encryption key for OAuth users
-              const encryptionKey = btoa(String.fromCharCode(
-                ...new Uint8Array(await window.crypto.getRandomValues(new Uint8Array(32)))
-              ));
-              localStorage.setItem('encryption_key', encryptionKey);
-            }
-            
-            // Simple check if user is logged in based on session and encryption key
-            const authenticated = !!session && !!localStorage.getItem('encryption_key');
-            
-            console.log("User authenticated:", authenticated);
-            setIsLoggedIn(authenticated);
-            setIsCheckingAuth(false);
-            setIsReady(true);
-            setAuthStatus(null);
-          } catch (error) {
-            console.error("Error in auth state change handler:", error);
-            setIsReady(true);
-            setIsCheckingAuth(false);
-            setIsLoggedIn(false);
-            setAuthStatus({
-              authenticated: false,
-              error: error instanceof Error ? 
-                  (error.message.includes('network') ? 'connection_error' : 'unknown_error') as any : 
-                  'unknown_error' as any,
-              errorMessage: error instanceof Error ? error.message : String(error),
-              retryable: true
-            });
-          }
-        });
-        
-        subscription = data.subscription;
-      } catch (error) {
-        console.error("Error setting up auth listener:", error);
-        if (isMounted) {
-          setIsReady(true);
-          setIsCheckingAuth(false);
-          setIsLoggedIn(false);
-          setAuthStatus({
-            authenticated: false,
-            error: 'unknown_error' as any,
-            errorMessage: "Failed to initialize authentication system",
-            retryable: true
-          });
-        }
-      }
-    };
-    
-    // Check initial auth state after setting up listener
-    const checkAuth = async () => {
-      try {
-        await setupAuthListener();
-        
-        // Initial session check with timeout - increased timeout to prevent issues
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Session check timed out")), AUTH_CHECK_FAST_TIMEOUT);
-        });
-        
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise])
-          .catch(error => {
-            console.error("Session check timed out:", error);
-            return { data: { session: null }, error: new Error("Session check timed out") };
-          }) as any;
-        
-        if (!isMounted) return;
-        
-        if (error) {
-          console.error("Session check error:", error);
-          setAuthStatus({
-            authenticated: false,
-            error: 'session_error' as any,
-            errorMessage: error.message,
-            retryable: true
-          });
-          setIsLoggedIn(false);
-        } else {
-          // Simple check if user is logged in based on session and encryption key
-          const authenticated = !!session && !!localStorage.getItem('encryption_key');
-          
-          console.log("Initial auth check:", authenticated);
-          setIsLoggedIn(authenticated);
-          setAuthStatus(null);
-        }
-      } catch (error) {
-        console.error("Auth check error:", error);
-        if (isMounted) {
-          setAuthStatus({
-            authenticated: false,
-            error: 'unknown_error' as any,
-            errorMessage: "Failed to check authentication status",
-            retryable: true
-          });
-          setIsLoggedIn(false);
-        }
-      } finally {
-        if (isMounted) {
-          setIsReady(true);
-          setIsCheckingAuth(false);
-        }
-      }
-    };
-    
-    checkAuth();
-    
-    // Increased timeout value to prevent auth timeout issues
-    // Only set timeout if we're actually checking auth
-    const forceReadyTimeout = isCheckingAuth ? setTimeout(() => {
-      if (isMounted && isCheckingAuth) {
-        console.log("Auth check timed out, completing auth flow");
-        // FIX: Use getSession() instead of directly accessing supabase.auth.session
-        supabase.auth.getSession().then(({ data }) => {
-          const currentSession = data.session;
-          const hasEncryptionKey = !!localStorage.getItem('encryption_key');
-          
-          // If we have both session and key, consider authenticated
-          if (currentSession && hasEncryptionKey) {
-            setIsLoggedIn(true);
-            setAuthStatus(null);
-          } else {
-            setIsLoggedIn(false);
-            setAuthStatus({
-              authenticated: false,
-              error: 'timeout_error' as any,
-              errorMessage: "Authentication check timed out. Please try logging in again.",
-              retryable: true
-            });
-          }
-          
-          setIsReady(true);
-          setIsCheckingAuth(false);
-        });
-      }
-    }, AUTH_CHECK_TIMEOUT) : null;
-    
-    // Cleanup subscription on unmount
-    return () => {
-      isMounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-      if (forceReadyTimeout) {
-        clearTimeout(forceReadyTimeout);
-      }
-    };
-  }, []);
-
-  // Protected route component
-  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    if (!isReady || isCheckingAuth) {
-      return (
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin mb-4"></div>
-            <p>Loading...</p>
-          </div>
-        </div>
-      );
-    }
-    
-    if (authStatus?.error) {
-      return (
-        <div className="flex items-center justify-center h-screen">
-          <div className="bg-destructive/10 p-6 rounded-lg max-w-md">
-            <h2 className="text-xl font-semibold text-destructive mb-2">Authentication Error</h2>
-            <p className="mb-4">{authStatus.errorMessage || "An error occurred during authentication"}</p>
-            <button 
-              className="bg-primary text-primary-foreground px-4 py-2 rounded"
-              onClick={() => window.location.href = '/login'}
-            >
-              Return to Login
-            </button>
-          </div>
-        </div>
-      );
-    }
-    
-    if (!isLoggedIn) return <Navigate to="/login" replace />;
-    
-    return <>{children}</>;
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthHandler />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <Settings />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthHandler />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };

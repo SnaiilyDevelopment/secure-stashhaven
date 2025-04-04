@@ -1,15 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsContent } from '@/components/ui/tabs';
 import FileList from './FileList';
-import SearchBar from './SearchBar';
 import { FileMetadata } from '@/lib/storage';
 import { SharedFile } from '@/lib/filesharing';
 import { useSearch } from '@/hooks/useSearch';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { AlertCircle, Upload } from 'lucide-react';
 import { FileItem } from './FileList';
 import ShareFileDialog from './ShareFileDialog';
+import FileFiltering from './file-list/FileFiltering';
 
 interface FilesSectionProps {
   files: FileMetadata[];
@@ -185,19 +185,12 @@ const FilesSection: React.FC<FilesSectionProps> = ({
         </div>
       )}
 
-      <SearchBar value={searchTerm} onChange={onSearchChange} />
-      
-      <Tabs 
-        defaultValue="my-files" 
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as 'my-files' | 'shared-with-me')}
-        className="w-full"
+      <FileFiltering
+        searchTerm={searchTerm}
+        onSearchChange={onSearchChange}
+        activeTab={activeTab}
+        onTabChange={(value) => setActiveTab(value as 'my-files' | 'shared-with-me')}
       >
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="my-files">My Files</TabsTrigger>
-          <TabsTrigger value="shared-with-me">Shared with me</TabsTrigger>
-        </TabsList>
-        
         <TabsContent value="my-files" className="mt-6">
           <FileList 
             files={adaptedFiles}
@@ -218,7 +211,7 @@ const FilesSection: React.FC<FilesSectionProps> = ({
             emptyMessage="No files have been shared with you yet."
           />
         </TabsContent>
-      </Tabs>
+      </FileFiltering>
       
       {selectedFile && (
         <ShareFileDialog
