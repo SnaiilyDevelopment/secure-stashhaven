@@ -4,6 +4,7 @@ import { useAuthState } from "./useAuthState";
 import { AuthContextType } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { AUTH_CHECK_TIMEOUT, AUTH_CHECK_FAST_TIMEOUT } from "@/lib/storage/constants";
+import { AuthError } from "@/lib/auth/types";
 
 // Create the context with undefined as default
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
