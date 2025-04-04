@@ -30,11 +30,27 @@ export const downloadEncryptedFile = async (
       .from(bucketName)
       .download(filePath);
     
-    if (error || !data) {
-      console.error("File download error:", error);
+    // Enhanced error checking for download
+    if (error) {
+      // Log the specific error object from Supabase
+      console.error("Supabase storage download error:", JSON.stringify(error, null, 2));
       toast({
         title: "Download failed",
-        description: error?.message || "Failed to download the file.",
+        // Check for 404 specifically within the error message string
+        description: error.message?.includes('404') || error.message?.toLowerCase().includes('not found')
+                     ? `File not found at path: ${filePath}`
+                     : error.message || "Failed to download the file.",
+        variant: "destructive"
+      });
+      return null;
+    }
+    
+    if (!data) {
+      // Log if data is null/undefined even if no explicit error was thrown
+      console.error(`File download failed: No data received for path ${filePath}, but no explicit Supabase error object.`);
+       toast({
+        title: "Download failed",
+        description: `Could not retrieve file data for: ${filePath}. The file might be empty or inaccessible.`,
         variant: "destructive"
       });
       return null;
