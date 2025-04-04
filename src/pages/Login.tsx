@@ -59,16 +59,22 @@ const Login = () => {
       const status = await isAuthenticated();
 
       if (status.error) {
-        console.error("Authentication error:", status.error, status.errorMessage);
+        console.error("Authentication error detected by isAuthenticated:", status.error, status.errorMessage);
+        // Add specific logging for the potential OAuth key missing state
+        const { data: sessionData } = await supabase.auth.getSession(); // Check session again for context
+        if (sessionData.session && status.error === AuthError.MISSING_ENCRYPTION_KEY) {
+          console.warn("OAuth Login State Issue Suspected: Session exists but encryption key is missing in localStorage. The application needs to handle key setup after OAuth login (e.g., fetch metadata, prompt for password if needed).");
+        }
         setAuthStatus(status);
-        handleAuthError(status);
+        handleAuthError(status); // Display error toast to the user
       }
 
       if (status.authenticated) {
         console.log("User authenticated via isAuthenticated(), redirecting to dashboard");
         navigate('/dashboard', { replace: true });
       } else {
-        console.log("User not authenticated, showing login page");
+        // No session and no key, or some other non-error state from isAuthenticated that doesn't require error handling
+        console.log("User not authenticated or state indeterminate (e.g., no session), showing login page");
       }
     } catch (error) {
       console.error("Authentication check failed:", error);
