@@ -98,33 +98,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Increased timeout value to prevent auth timeout issues
     // Only set timeout if we're actually checking auth
-    const forceReadyTimeout = isCheckingAuth ? setTimeout(() => {
+    const forceReadyTimeout = isCheckingAuth ? setTimeout(async () => {
       if (isMounted && isCheckingAuth) {
-        console.log("Auth check timed out, completing auth flow");
-        // Use getSession() instead of directly accessing supabase.auth.session
-        supabase.auth.getSession().then(({ data }) => {
-          const currentSession = data.session;
+        console.log("Attempting fast auth check...");
+        try {
+          // Fast check for session and encryption key
+          const { data: { session } } = await supabase.auth.getSession();
           const hasEncryptionKey = !!localStorage.getItem('encryption_key');
           
-          // If we have both session and key, consider authenticated
-          if (currentSession && hasEncryptionKey) {
+          if (session && hasEncryptionKey) {
+            console.log("Fast auth check successful");
             setIsLoggedIn(true);
             setAuthStatus(null);
           } else {
+            console.log("Fast auth check failed, user needs to log in");
             setIsLoggedIn(false);
             setAuthStatus({
               authenticated: false,
-              error: 'timeout_error' as any,
-              errorMessage: "Authentication check timed out. Please try logging in again.",
+              error: AuthError.TIMEOUT,
+              errorMessage: "Please log in to continue.",
               retryable: true
             });
           }
-          
+        } catch (error) {
+          console.error("Fast auth check failed:", error);
+          setIsLoggedIn(false);
+          setAuthStatus({
+            authenticated: false,
+            error: AuthError.NETWORK,
+            errorMessage: "Network error during authentication check.",
+            retryable: true
+          });
+        } finally {
           setIsReady(true);
           setIsCheckingAuth(false);
-        });
+        }
       }
-    }, AUTH_CHECK_TIMEOUT) : null;
+    }, AUTH_CHECK_FAST_TIMEOUT) : null;
     
     // Cleanup subscription on unmount
     return () => {

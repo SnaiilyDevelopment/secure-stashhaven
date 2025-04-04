@@ -23,7 +23,6 @@ const LoginForm: React.FC = () => {
 
   // Clear any existing session if the user is on the login page
   useEffect(() => {
-    // Check for redirect message in the URL
     const params = new URLSearchParams(location.search);
     const message = params.get('message');
 
@@ -35,28 +34,28 @@ const LoginForm: React.FC = () => {
       });
     }
 
-    // If user navigated to login page, clear auth state
-    const clearAuth = async () => {
+    // Fast check and cleanup of auth state
+    const quickAuthCheck = async () => {
       try {
-        // Only sign out if there is actually a session
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
           await supabase.auth.signOut();
-
-          // Try/catch around localStorage operations to handle SecurityErrors
-          try {
-            localStorage.removeItem('encryption_key');
-          } catch (error) {
-            console.error("Error clearing encryption key from localStorage:", error);
-            // We can still proceed even if this fails
-          }
+          localStorage.removeItem('encryption_key');
+          console.log("Cleared existing auth state");
         }
       } catch (error) {
-        console.error("Error clearing authentication:", error);
+        console.warn("Auth check/cleanup error:", error);
       }
     };
 
-    clearAuth();
+    // Set a timeout for the auth check
+    const timeoutId = setTimeout(() => {
+      console.log("Quick auth check completed");
+    }, 5000);
+
+    quickAuthCheck();
+
+    return () => clearTimeout(timeoutId);
   }, [location]);
 
   const validateEmail = (email: string): boolean => {
