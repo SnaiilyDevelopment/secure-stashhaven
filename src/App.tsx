@@ -222,19 +222,31 @@ const App = () => {
     checkAuth();
     
     // Increased timeout value to prevent auth timeout issues
-    const forceReadyTimeout = setTimeout(() => {
+    // Only set timeout if we're actually checking auth
+    const forceReadyTimeout = isCheckingAuth ? setTimeout(() => {
       if (isMounted && isCheckingAuth) {
-        console.log("Forcing ready state after timeout");
+        console.log("Auth check timed out, completing auth flow");
+        const currentSession = supabase.auth.session;
+        const hasEncryptionKey = !!localStorage.getItem('encryption_key');
+        
+        // If we have both session and key, consider authenticated
+        if (currentSession && hasEncryptionKey) {
+          setIsLoggedIn(true);
+          setAuthStatus(null);
+        } else {
+          setIsLoggedIn(false);
+          setAuthStatus({
+            authenticated: false,
+            error: 'timeout_error' as any,
+            errorMessage: "Authentication check timed out. Please try logging in again.",
+            retryable: true
+          });
+        }
+        
         setIsReady(true);
         setIsCheckingAuth(false);
-        setAuthStatus({
-          authenticated: false,
-          error: 'timeout_error' as any,
-          errorMessage: "Authentication check timed out. Please try logging in again.",
-          retryable: true
-        });
       }
-    }, AUTH_CHECK_TIMEOUT); // Increased from 6000ms for better reliability
+    }, AUTH_CHECK_TIMEOUT) : null;
     
     // Cleanup subscription on unmount
     return () => {
