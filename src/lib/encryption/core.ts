@@ -71,11 +71,21 @@ export const generateSecurePassword = (length = 20): string => {
   return password;
 };
 
+// Check if crypto is available
+const checkCrypto = () => {
+  if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
+    throw new Error('Crypto API not available');
+  }
+  return window.crypto;
+};
+
 // Matrix-inspired key derivation with stronger parameters
 export const deriveKeyFromPassword = async (password: string, salt?: ArrayBuffer | string): Promise<{ key: string, salt: string }> => {
+  const crypto = checkCrypto();
+  
   // Generate a salt if one isn't provided
   if (!salt) {
-    salt = window.crypto.getRandomValues(new Uint8Array(16));
+    salt = crypto.getRandomValues(new Uint8Array(16));
   } else if (typeof salt === 'string') {
     salt = base64ToArrayBuffer(salt);
   }

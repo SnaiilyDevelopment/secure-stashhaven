@@ -9,11 +9,16 @@ export const loginUser = async (email: string, password: string): Promise<boolea
   try {
     console.log("Attempting login for user:", email);
     
-    // Sign in with Supabase
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    try {
+      if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
+        throw new Error('Your browser does not support the required encryption features');
+      }
+      
+      // Sign in with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
     
     if (error || !data.user) {
       console.error("Login error:", error);
