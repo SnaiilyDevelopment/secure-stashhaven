@@ -59,7 +59,8 @@ export const downloadEncryptedFile = async (
     onProgress?.(50); // Download complete, starting decryption
     
     // Decrypt the file
-    const decryptedBlob = await decryptFile(data, encryptionKey, originalType);
+    // Pass originalName as the fileName for AAD matching
+    const decryptedBlob = await decryptFile(data, encryptionKey, originalType, originalName);
     
     onProgress?.(100); // Process complete
     

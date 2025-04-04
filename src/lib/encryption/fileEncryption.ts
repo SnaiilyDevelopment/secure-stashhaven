@@ -37,7 +37,8 @@ export const encryptFile = async (file: File, encryptionKey: string): Promise<Bl
 };
 
 // Decrypt a file with the user's encryption key
-export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, originalType: string, fileName: string = ''): Promise<Blob> => {
+// Make fileName required as it's essential for AAD
+export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, originalType: string, fileName: string): Promise<Blob> => {
   const key = await importEncryptionKey(encryptionKey);
   const encryptedData = await encryptedBlob.arrayBuffer();
   
@@ -47,8 +48,8 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
   // Extract encrypted content (everything after IV)
   const encryptedContent = encryptedData.slice(12);
   
-  // Fix: Only create additionalData if fileName is provided
-  const additionalData = fileName ? new TextEncoder().encode(`file:${fileName}:${originalType}`) : undefined;
+  // Always create additionalData using the required fileName and originalType
+  const additionalData = new TextEncoder().encode(`file:${fileName}:${originalType}`);
   
   try {
     // Decrypt the file
@@ -56,7 +57,7 @@ export const decryptFile = async (encryptedBlob: Blob, encryptionKey: string, or
       { 
         name: 'AES-GCM', 
         iv,
-        ...(additionalData ? { additionalData } : {})
+        additionalData // Always include AAD
       },
       key,
       encryptedContent
