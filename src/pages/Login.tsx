@@ -87,25 +87,22 @@ const Login = () => {
 
   useEffect(() => {
     // Set a short timeout to ensure the check doesn't hang
-    const authTimeout = setTimeout(() => {
-      if (checkingAuth) {
-        console.log("Auth check timed out, allowing login page to display");
-        setCheckingAuth(false);
-        setAuthStatus({
-          authenticated: false,
-          error: AuthError.TIMEOUT,
-          errorMessage: "Authentication check took too long. You can still try to log in.",
-          retryable: true
-        });
-      }
-    }, AUTH_CHECK_TIMEOUT); // Use the constant here
-
+    // Removed the timeout logic that caused premature error messages.
+    // The checkAuth function's finally block handles setting checkingAuth to false.
+    // We still need a variable to potentially clear in the return function, even if it's null initially.
+    const authTimeout: NodeJS.Timeout | null = null;
     // Only check auth on initial load and retries, not on every render
     if (retryCount > 0 || authAttempts === 0) {
       checkAuth();
     }
 
-    return () => clearTimeout(authTimeout);
+    return () => {
+      // Although authTimeout is now always null initially, keep check for robustness
+      // if logic changes later. The primary cleanup should be for the async checkAuth itself.
+      if (authTimeout) clearTimeout(authTimeout);
+      // TODO: Implement cancellation for the actual checkAuth() async operation if possible.
+      // Example: if checkAuth returns a cleanup function or uses AbortController.
+    };
   }, [navigate, retryCount]); // Added retryCount dependency to trigger recheck
 
   // Function to retry authentication
