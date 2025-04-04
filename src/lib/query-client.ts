@@ -1,6 +1,6 @@
 
 import { QueryClient } from "@tanstack/react-query";
-import { toast } from "./hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 // Custom error handler for the query client
 const queryErrorHandler = (error: unknown) => {
