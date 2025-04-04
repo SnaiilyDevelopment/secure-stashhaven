@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, KeyRound, ArrowRight, Loader2 } from 'lucide-react';
@@ -27,7 +26,7 @@ const LoginForm: React.FC = () => {
     // Check for redirect message in the URL
     const params = new URLSearchParams(location.search);
     const message = params.get('message');
-    
+
     if (message === 'session_expired') {
       toast({
         title: "Session Expired",
@@ -35,7 +34,7 @@ const LoginForm: React.FC = () => {
         variant: "default"
       });
     }
-    
+
     // If user navigated to login page, clear auth state
     const clearAuth = async () => {
       try {
@@ -43,7 +42,7 @@ const LoginForm: React.FC = () => {
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           await supabase.auth.signOut();
-          
+
           // Try/catch around localStorage operations to handle SecurityErrors
           try {
             localStorage.removeItem('encryption_key');
@@ -56,21 +55,21 @@ const LoginForm: React.FC = () => {
         console.error("Error clearing authentication:", error);
       }
     };
-    
+
     clearAuth();
   }, [location]);
-  
+
   const validateEmail = (email: string): boolean => {
     if (!email) {
       setEmailError('Email is required');
       return false;
     }
-    
+
     if (!EMAIL_REGEX.test(email)) {
       setEmailError('Please enter a valid email address');
       return false;
     }
-    
+
     setEmailError('');
     return true;
   };
@@ -78,7 +77,7 @@ const LoginForm: React.FC = () => {
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newEmail = e.target.value;
     setEmail(newEmail);
-    
+
     // Clear error when typing
     if (emailError) {
       validateEmail(newEmail);
@@ -87,7 +86,7 @@ const LoginForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate email before submission
     if (!validateEmail(email)) {
       toast({
@@ -97,22 +96,22 @@ const LoginForm: React.FC = () => {
       });
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       console.log("Attempting login for:", email);
-      
+
       // Add a timeout to prevent hanging on login
       const loginPromise = loginUser(email, password);
       const timeoutPromise = new Promise<boolean>((_, reject) => {
         setTimeout(() => reject(new Error("Login timed out")), LOGIN_TIMEOUT);
       });
-      
+
       const success = await Promise.race([loginPromise, timeoutPromise])
         .catch(error => {
           console.error("Login error:", error);
-          
+
           // Special handling for SecurityError
           if (error instanceof Error && error.name === 'SecurityError') {
             toast({
@@ -121,24 +120,32 @@ const LoginForm: React.FC = () => {
               variant: "destructive"
             });
           } else {
+            let errorMessage = "An unexpected error occurred. Please try again.";
+            if (error instanceof Error) {
+              if (error.message.includes('timeout')) {
+                errorMessage = "Login request timed out. Please try again.";
+              } else if (error.message.includes('network')) {
+                errorMessage = "Network error. Please check your connection and try again.";
+              }
+            }
             toast({
               title: "Login Failed",
-              description: "The login process failed. Please try again.",
+              description: errorMessage,
               variant: "destructive"
             });
           }
           return false;
         });
-      
+
       if (success) {
         // Show success toast
         toast({
           title: "Login Successful",
           description: "Welcome back to your secure vault.",
         });
-        
+
         console.log("Login successful, redirecting to dashboard...");
-        
+
         // Force redirect with a small delay to ensure the auth state is updated
         setTimeout(() => {
           console.log("Executing redirect to dashboard");
@@ -160,7 +167,7 @@ const LoginForm: React.FC = () => {
   return (
     <div className="space-y-4">
       <OAuthButtons isLoading={isOAuthLoading} />
-      
+
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t border-green-200" />
@@ -169,7 +176,7 @@ const LoginForm: React.FC = () => {
           <span className="bg-white px-2 text-green-600 rounded">Or continue with</span>
         </div>
       </div>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="space-y-4">
           <div className="space-y-2">

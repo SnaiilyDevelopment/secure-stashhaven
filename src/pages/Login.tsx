@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LockKeyhole, RefreshCw, ShieldAlert } from 'lucide-react';
@@ -12,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 
 const MAX_AUTH_ATTEMPTS = 3;
+const AUTH_CHECK_TIMEOUT = 5000; // Increased timeout
 
 const Login = () => {
   const navigate = useNavigate();
@@ -35,16 +35,16 @@ const Login = () => {
     }
 
     setAuthAttempts(prev => prev + 1);
-    
+
     try {
       setCheckingAuth(true);
       console.log("Checking authentication status...");
-      
+
       try {
         // First check if we have a session and encryption key (fast path)
         const { data: sessionData } = await supabase.auth.getSession();
         const hasEncryptionKey = !!localStorage.getItem('encryption_key');
-        
+
         if (sessionData.session && hasEncryptionKey) {
           console.log("Session and encryption key found, redirecting to dashboard");
           navigate('/dashboard', { replace: true });
@@ -54,16 +54,16 @@ const Login = () => {
         console.error("Error in fast path session check:", e);
         // Continue to full auth check
       }
-      
+
       // Fallback to enhanced authentication check with better error handling
       const status = await isAuthenticated();
-      
+
       if (status.error) {
         console.error("Authentication error:", status.error, status.errorMessage);
         setAuthStatus(status);
         handleAuthError(status);
       }
-      
+
       if (status.authenticated) {
         console.log("User authenticated via isAuthenticated(), redirecting to dashboard");
         navigate('/dashboard', { replace: true });
@@ -98,13 +98,13 @@ const Login = () => {
           retryable: true
         });
       }
-    }, 2000);
-    
+    }, AUTH_CHECK_TIMEOUT); // Use the constant here
+
     // Only check auth on initial load and retries, not on every render
     if (retryCount > 0 || authAttempts === 0) {
       checkAuth();
     }
-    
+
     return () => clearTimeout(authTimeout);
   }, [navigate, retryCount]); // Added retryCount dependency to trigger recheck
 
@@ -137,7 +137,7 @@ const Login = () => {
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 animate-fade-in">
       {/* 3D Interactive Background */}
       <ThreeDBackground color="#22c55e" />
-      
+
       <div className="w-full max-w-md mx-auto relative z-10">
         <div className="mb-8 text-center">
           <div className="flex justify-center mb-4">
@@ -148,7 +148,7 @@ const Login = () => {
           <h1 className="text-2xl font-medium tracking-tight text-green-800">Welcome to SafeHaven</h1>
           <p className="text-green-700/80 mt-2">Sign in to access your secure vault</p>
         </div>
-        
+
         {/* Show special alert for security errors */}
         {hasBrowserSecurityError && (
           <Alert variant="destructive" className="mb-4 backdrop-blur-sm bg-red-50/90 border-red-200">
@@ -164,7 +164,7 @@ const Login = () => {
             </AlertDescription>
           </Alert>
         )}
-        
+
         {/* Show error alert with retry button if there's an auth error */}
         {authStatus?.error && authStatus.retryable && !hasBrowserSecurityError && (
           <Alert variant="destructive" className="mb-4 backdrop-blur-sm bg-red-50/90 border-red-200">
@@ -181,7 +181,7 @@ const Login = () => {
             </AlertDescription>
           </Alert>
         )}
-        
+
         <Card className="animate-scale-in border-green-100 shadow-lg backdrop-blur-sm bg-white/70">
           <CardHeader>
             <CardTitle className="text-green-800">Sign In</CardTitle>
@@ -201,7 +201,7 @@ const Login = () => {
             </p>
           </CardFooter>
         </Card>
-        
+
         <div className="mt-8 text-center text-sm text-green-700/80">
           <p>Your data is end-to-end encrypted.</p>
           <p className="mt-1">Only you can access your files with your password.</p>
