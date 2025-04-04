@@ -226,25 +226,28 @@ const App = () => {
     const forceReadyTimeout = isCheckingAuth ? setTimeout(() => {
       if (isMounted && isCheckingAuth) {
         console.log("Auth check timed out, completing auth flow");
-        const currentSession = supabase.auth.session;
-        const hasEncryptionKey = !!localStorage.getItem('encryption_key');
-        
-        // If we have both session and key, consider authenticated
-        if (currentSession && hasEncryptionKey) {
-          setIsLoggedIn(true);
-          setAuthStatus(null);
-        } else {
-          setIsLoggedIn(false);
-          setAuthStatus({
-            authenticated: false,
-            error: 'timeout_error' as any,
-            errorMessage: "Authentication check timed out. Please try logging in again.",
-            retryable: true
-          });
-        }
-        
-        setIsReady(true);
-        setIsCheckingAuth(false);
+        // FIX: Use getSession() instead of directly accessing supabase.auth.session
+        supabase.auth.getSession().then(({ data }) => {
+          const currentSession = data.session;
+          const hasEncryptionKey = !!localStorage.getItem('encryption_key');
+          
+          // If we have both session and key, consider authenticated
+          if (currentSession && hasEncryptionKey) {
+            setIsLoggedIn(true);
+            setAuthStatus(null);
+          } else {
+            setIsLoggedIn(false);
+            setAuthStatus({
+              authenticated: false,
+              error: 'timeout_error' as any,
+              errorMessage: "Authentication check timed out. Please try logging in again.",
+              retryable: true
+            });
+          }
+          
+          setIsReady(true);
+          setIsCheckingAuth(false);
+        });
       }
     }, AUTH_CHECK_TIMEOUT) : null;
     
@@ -254,7 +257,9 @@ const App = () => {
       if (subscription) {
         subscription.unsubscribe();
       }
-      clearTimeout(forceReadyTimeout);
+      if (forceReadyTimeout) {
+        clearTimeout(forceReadyTimeout);
+      }
     };
   }, []);
 
