@@ -3,7 +3,7 @@ import React, { createContext, useEffect } from "react";
 import { useAuthState } from "./useAuthState";
 import { AuthContextType } from "./types";
 import { supabase } from "@/integrations/supabase/client";
-import { AUTH_CHECK_TIMEOUT } from "@/lib/storage/constants";
+import { AUTH_CHECK_TIMEOUT, AUTH_CHECK_FAST_TIMEOUT } from "@/lib/storage/constants";
 
 // Create the context with undefined as default
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
