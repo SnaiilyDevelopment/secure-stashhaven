@@ -104,18 +104,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { data: { session } } = await supabase.auth.getSession();
           const hasEncryptionKey = !!localStorage.getItem('encryption_key');
 
-          if (session && hasEncryptionKey) {
-            setIsLoggedIn(true);
-            setAuthStatus(null);
-          } else {
-            setIsLoggedIn(false);
-            setAuthStatus({
-              authenticated: false,
-              error: AuthError.TIMEOUT,
-              errorMessage: "Session not found or encryption key missing. Please try logging in.",
-              retryable: true
-            });
-          }
+          setIsLoggedIn(!!session && hasEncryptionKey);
+          setIsCheckingAuth(false);
+          setIsReady(true);
         } catch (error) {
           setIsLoggedIn(false);
           setAuthStatus({
