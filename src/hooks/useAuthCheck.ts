@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAuthenticated, AuthError, AuthStatus } from '@/lib/auth';
@@ -9,22 +8,32 @@ export const useAuthCheck = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<number>(Date.now());
   const navigate = useNavigate();
-  
+
   // Check authentication
   const checkAuth = useCallback(async () => {
     try {
       setLastChecked(Date.now());
       console.log("Checking authentication status...");
-      
+
+      // First check session directly
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (!sessionData.session) {
+        console.log("No active session found");
+        navigate('/login');
+        return;
+      }
+
       const authStatus = await isAuthenticated();
-      
+
       if (!authStatus.authenticated) {
         if (authStatus.error) {
           console.error("Auth error:", authStatus.error, authStatus.errorMessage);
           setAuthError(authStatus.errorMessage || "Authentication failed. Please log in again.");
-          
+
           // If error is non-retryable, redirect to login
           if (!authStatus.retryable) {
+            await supabase.auth.signOut();
             navigate('/login');
           }
         } else {
@@ -38,11 +47,11 @@ export const useAuthCheck = () => {
       setAuthError("Authentication check failed. You can try refreshing the page.");
     }
   }, [navigate]);
-  
+
   useEffect(() => {
     // Initialize auth check
     checkAuth();
-    
+
     // Set up auth state listener to handle events like token expiration
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth state changed:", event);
@@ -56,7 +65,7 @@ export const useAuthCheck = () => {
         checkAuth();
       }
     });
-    
+
     // Set interval to periodically check auth (every 5 minutes)
     const refreshInterval = setInterval(() => {
       // Only refresh if it's been more than 4 minutes since last check
@@ -64,17 +73,17 @@ export const useAuthCheck = () => {
         checkAuth();
       }
     }, 5 * 60 * 1000);
-    
+
     return () => {
       clearInterval(refreshInterval);
       subscription.unsubscribe();
     };
   }, [checkAuth, lastChecked, navigate]);
-  
+
   const handleRetry = () => {
     setAuthError(null);
     checkAuth();
   };
-  
+
   return { authError, handleRetry };
 };

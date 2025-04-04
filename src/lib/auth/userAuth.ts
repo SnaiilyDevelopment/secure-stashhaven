@@ -216,7 +216,11 @@ export const signInWithProvider = async (provider: 'google' | 'github'): Promise
 };
 
 // Get current user's encryption key
-export const getCurrentUserEncryptionKey = (): string | null => {
+export const getCurrentUserEncryptionKey = async (): Promise<string | null> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error("Auth session missing!");
+  }
   return localStorage.getItem('encryption_key');
 };
 
