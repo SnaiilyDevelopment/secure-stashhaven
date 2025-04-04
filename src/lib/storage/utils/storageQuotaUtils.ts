@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { formatBytes as formatBytesSizeUtil } from './formatUtils';
+import { getUserStorageUsage } from '../utils/storageUsageUtils';
 
 // Default quota in bytes (50MB for free tier)
 const DEFAULT_QUOTA = 50 * 1024 * 1024;
