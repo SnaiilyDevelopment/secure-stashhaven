@@ -3,7 +3,9 @@
 export { 
   uploadEncryptedFile, 
   downloadEncryptedFile, 
-  deleteFile 
+  deleteFile,
+  hasEnoughStorageSpace,
+  formatBytes
 } from './fileOperations';
 
 export { 
@@ -14,6 +16,8 @@ export {
 
 export {
   getUserStorageUsage,
-  formatBytes,
   ensureStorageBucket
 } from './storageUtils';
+
+// Export storage constants
+export { STORAGE_BUCKET_NAME } from './constants';

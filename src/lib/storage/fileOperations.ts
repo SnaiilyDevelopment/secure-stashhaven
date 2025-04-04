@@ -4,3 +4,6 @@ export { uploadEncryptedFile } from './operations/uploadOperations';
 export { downloadEncryptedFile } from './operations/downloadOperations';
 export { deleteFile } from './operations/deleteOperations';
 export { listFiles } from './operations/listOperations';
+
+// Export file utility operations
+export { hasEnoughStorageSpace, formatBytes } from './utils/storageQuotaUtils';

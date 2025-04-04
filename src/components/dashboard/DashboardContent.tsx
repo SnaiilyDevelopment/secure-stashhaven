@@ -5,16 +5,9 @@ import FolderManager from './FolderManager';
 import { SharedFile } from '@/lib/filesharing';
 import { FileMetadata } from '@/lib/storage';
 import { getFilesSharedWithMe } from '@/lib/filesharing';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 import UploadDialog from './UploadDialog';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import AddContentActions from './actions/AddContentActions';
+import { useSharedFiles } from '@/hooks/useSharedFiles';
 
 interface DashboardContentProps {
   files: FileMetadata[];
@@ -39,27 +32,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   onFolderCreate,
   onFolderSelect
 }) => {
-  const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([]);
-  const [isLoadingShared, setIsLoadingShared] = useState(true);
+  const { sharedFiles, isLoadingShared } = useSharedFiles();
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadDialogAction, setUploadDialogAction] = useState<'file' | 'folder' | 'new-folder'>('file');
-  
-  // Load shared files
-  useEffect(() => {
-    const loadSharedFiles = async () => {
-      try {
-        setIsLoadingShared(true);
-        const shared = await getFilesSharedWithMe();
-        setSharedFiles(shared);
-      } catch (error) {
-        console.error("Error loading shared files:", error);
-      } finally {
-        setIsLoadingShared(false);
-      }
-    };
-    
-    loadSharedFiles();
-  }, []);
   
   const handleOpenUploadDialog = (action: 'file' | 'folder' | 'new-folder') => {
     setUploadDialogAction(action);

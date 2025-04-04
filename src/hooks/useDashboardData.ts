@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { listUserFiles, FileMetadata } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
 import { STORAGE_BUCKET_NAME } from '@/lib/storage/constants';
+import { useFileFiltering } from '@/hooks/useFileFiltering';
 
 export const useDashboardData = (initialLoad = true) => {
   const [files, setFiles] = useState<FileMetadata[]>([]);
@@ -10,6 +11,8 @@ export const useDashboardData = (initialLoad = true) => {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  
+  const { filterFilesBySearchAndFolder } = useFileFiltering();
   
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -94,17 +97,7 @@ export const useDashboardData = (initialLoad = true) => {
   }, [initialLoad, loadData]);
   
   // Filter files based on search query and current folder
-  const filteredFiles = files.filter(file => {
-    const matchesSearch = searchQuery 
-      ? file.original_name.toLowerCase().includes(searchQuery.toLowerCase())
-      : true;
-      
-    const matchesFolder = currentFolder === null 
-      ? file.file_path.indexOf('/') === -1 // Files not in folders
-      : file.file_path.startsWith(`${currentFolder}/`); // Files in the selected folder
-      
-    return matchesSearch && matchesFolder;
-  });
+  const filteredFiles = filterFilesBySearchAndFolder(files, searchQuery, currentFolder);
     
   return {
     files,
