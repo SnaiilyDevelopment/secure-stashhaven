@@ -18,6 +18,8 @@ import FileListItem from './file-list/FileListItem';
 import EmptyFileList from './file-list/EmptyFileList';
 import FileListSkeleton from './file-list/FileListSkeleton';
 import { toast } from '@/components/ui/use-toast';
+import { handleFileDownload } from './actions/fileDownloadAction';
+import { handleFileDelete } from './actions/fileDeleteAction';
 
 export interface FileItem {
   id: string;
@@ -56,6 +58,19 @@ const FileList: React.FC<FileListProps> = ({
   isDropTarget = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+
+  // Define default handlers that will be used if no custom handlers are provided
+  const defaultDownloadHandler = async (id: string, filePath: string, name: string, type: string) => {
+    await handleFileDownload(filePath, name, type);
+  };
+
+  const defaultDeleteHandler = async (id: string, filePath: string) => {
+    const fileName = files.find(f => f.id === id)?.name || 'this file';
+    const success = await handleFileDelete(filePath, fileName);
+    if (success && onDeleteComplete) {
+      onDeleteComplete();
+    }
+  };
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -133,8 +148,8 @@ const FileList: React.FC<FileListProps> = ({
                   <FileListItem 
                     key={file.id}
                     file={file}
-                    onDownload={onDownload}
-                    onDelete={onDelete}
+                    onDownload={onDownload || defaultDownloadHandler}
+                    onDelete={onDelete || defaultDeleteHandler}
                     onDeleteComplete={onDeleteComplete}
                     onShare={onShare}
                   />

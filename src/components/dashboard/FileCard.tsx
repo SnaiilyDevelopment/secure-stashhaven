@@ -15,6 +15,7 @@ export interface FileItem {
   encrypted: boolean;
   isShared?: boolean;
   owner?: string;
+  filePath: string;
 }
 
 interface FileCardProps {
@@ -22,9 +23,16 @@ interface FileCardProps {
   onDownload?: (fileId: string) => void;
   onDelete?: (fileId: string) => void;
   onShare?: (fileId: string) => void;
+  onDeleteComplete?: () => void;
 }
 
-const FileCard: React.FC<FileCardProps> = ({ file, onDownload, onDelete, onShare }) => {
+const FileCard: React.FC<FileCardProps> = ({ 
+  file, 
+  onDownload, 
+  onDelete, 
+  onShare,
+  onDeleteComplete 
+}) => {
   // Get appropriate icon for file type
   const getFileTypeIcon = (fileType: string) => {
     if (fileType.includes('image/')) return <ImageIcon className="h-8 w-8 text-green-500" />;
@@ -60,10 +68,14 @@ const FileCard: React.FC<FileCardProps> = ({ file, onDownload, onDelete, onShare
           </div>
           <FileCardActions 
             fileId={file.id}
+            filePath={file.filePath}
+            fileName={file.name}
+            fileType={file.type}
             isShared={file.isShared}
             onDownload={onDownload}
             onDelete={onDelete}
             onShare={onShare}
+            onDeleteComplete={onDeleteComplete}
           />
         </div>
       </CardContent>

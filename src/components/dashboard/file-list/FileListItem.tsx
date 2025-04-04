@@ -6,6 +6,8 @@ import { Download, Trash2, Lock, Share2 } from 'lucide-react';
 import { formatBytes } from '@/lib/storage/storageUtils';
 import { FileItem } from '../FileList';
 import FileTypeIcon from './FileTypeIcon';
+import { handleFileDownload } from '../actions/fileDownloadAction';
+import { handleFileDelete } from '../actions/fileDeleteAction';
 
 interface FileListItemProps {
   file: FileItem;
@@ -22,10 +24,24 @@ const FileListItem: React.FC<FileListItemProps> = ({
   onDeleteComplete,
   onShare
 }) => {
-  const handleDelete = () => {
+  const handleDownloadClick = async () => {
+    if (onDownload) {
+      onDownload(file.id, file.filePath, file.name, file.type);
+    } else {
+      await handleFileDownload(file.filePath, file.name, file.type);
+    }
+  };
+
+  const handleDeleteClick = async () => {
     if (confirm(`Are you sure you want to delete ${file.name}?`)) {
-      onDelete?.(file.id, file.filePath);
-      onDeleteComplete?.();
+      if (onDelete) {
+        onDelete(file.id, file.filePath);
+      } else {
+        const success = await handleFileDelete(file.filePath, file.name);
+        if (success && onDeleteComplete) {
+          onDeleteComplete();
+        }
+      }
     }
   };
 
@@ -59,17 +75,15 @@ const FileListItem: React.FC<FileListItemProps> = ({
       <TableCell>{formatDate(file.dateAdded)}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
-          {onDownload && (
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => onDownload(file.id, file.filePath, file.name, file.type)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Download className="h-4 w-4" />
-              <span className="sr-only">Download</span>
-            </Button>
-          )}
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleDownloadClick}
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Download className="h-4 w-4" />
+            <span className="sr-only">Download</span>
+          </Button>
           
           {onShare && !file.isShared && (
             <Button 
@@ -83,17 +97,15 @@ const FileListItem: React.FC<FileListItemProps> = ({
             </Button>
           )}
           
-          {onDelete && (
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={handleDelete}
-              className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Delete</span>
-            </Button>
-          )}
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleDeleteClick}
+            className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Delete</span>
+          </Button>
         </div>
       </TableCell>
     </TableRow>

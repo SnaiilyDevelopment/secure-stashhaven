@@ -9,22 +9,51 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Download, Trash2, MoreHorizontal, Share } from 'lucide-react';
+import { handleFileDownload } from './actions/fileDownloadAction';
+import { handleFileDelete } from './actions/fileDeleteAction';
 
 interface FileCardActionsProps {
   fileId: string;
+  filePath?: string;
+  fileName?: string;
+  fileType?: string;
   isShared?: boolean;
   onDownload?: (fileId: string) => void;
   onDelete?: (fileId: string) => void;
   onShare?: (fileId: string) => void;
+  onDeleteComplete?: () => void;
 }
 
 const FileCardActions: React.FC<FileCardActionsProps> = ({
   fileId,
+  filePath,
+  fileName,
+  fileType,
   isShared,
   onDownload,
   onDelete,
-  onShare
+  onShare,
+  onDeleteComplete
 }) => {
+  const handleDownloadClick = async () => {
+    if (onDownload) {
+      onDownload(fileId);
+    } else if (filePath && fileName && fileType) {
+      await handleFileDownload(filePath, fileName, fileType);
+    }
+  };
+
+  const handleDeleteClick = async () => {
+    if (onDelete) {
+      onDelete(fileId);
+    } else if (filePath && fileName) {
+      const success = await handleFileDelete(filePath, fileName);
+      if (success && onDeleteComplete) {
+        onDeleteComplete();
+      }
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -33,9 +62,9 @@ const FileCardActions: React.FC<FileCardActionsProps> = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-white/90 backdrop-blur-sm border-green-100">
-        {onDownload && (
+        {(onDownload || (filePath && fileName && fileType)) && (
           <DropdownMenuItem 
-            onClick={() => onDownload(fileId)} 
+            onClick={handleDownloadClick}
             className="text-green-700 focus:text-green-700 focus:bg-green-50"
           >
             <Download className="h-4 w-4 mr-2" />
@@ -53,11 +82,11 @@ const FileCardActions: React.FC<FileCardActionsProps> = ({
           </DropdownMenuItem>
         )}
         
-        {onDelete && (
+        {(onDelete || (filePath && fileName)) && (
           <>
             {(onDownload || onShare) && <DropdownMenuSeparator />}
             <DropdownMenuItem
-              onClick={() => onDelete(fileId)}
+              onClick={handleDeleteClick}
               className="text-red-500 focus:text-red-500 focus:bg-red-50"
             >
               <Trash2 className="h-4 w-4 mr-2" />
